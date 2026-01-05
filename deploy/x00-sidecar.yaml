@@ -1,15 +1,141 @@
+# X00 Sidecar Deployment Template
+# This shows how to deploy X00 as a sidecar alongside your application
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: x00-config
+  namespace: default
+data:
+  config.yaml: |
+    version: v1
+    policy:
+      mode: enforce          # disabled, audit, or enforce
+      blockEnviron: true     # Block /proc/*/environ reads
+      blockMem: true         # Block /proc/*/mem reads  
+      blockMaps: false       # Block /proc/*/maps reads
+      blockPtrace: true      # Block ptrace to protected processes
+      allowSelfRead: true    # Allow process to read its own /proc files
+      auditAll: false        # Audit all accesses, not just blocked ones
+    
+    secrets:
+      - name: myapp-secrets
+        selector:
+          binary: "myapp"    # Inject into processes named "myapp"
+        secretRefs:
+          - name: DATABASE_PASSWORD
+            source:
+              secretKeyRef:
+                name: myapp-db-credentials
+                key: password
+          - name: API_KEY
+            source:
+              secretKeyRef:
+                name: myapp-api-key
+                key: api-key
+    
+    monitoring:
+      enabled: true
+      metricsPort: 9090
+      logLevel: info
+      auditLog: /var/log/x00/audit.log
+---
 apiVersion: v1
 kind: Pod
 metadata:
   name: x00-demo
+  labels:
+    app: x00-demo
+    x00.io/protected: "true"
 spec:
+  shareProcessNamespace: true  # Required for X00 to access app processes
+  
   containers:
+  # Your application container
   - name: myapp
-    image: alpine
-    command: ["sleep", "3600"]
+    image: alpine:latest
+    command: ["sh", "-c", "echo 'App starting'; sleep 3600"]
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "200m"
+    # No secrets mounted here - X00 injects them at runtime
+    volumeMounts:
+    - name: x00-secrets-runtime
+      mountPath: /run/x00/secrets
+      readOnly: true
+
+  # X00 sidecar container
   - name: x00
     image: your-registry/x00:latest
+    args:
+      - "-config=/etc/x00/config.yaml"
     securityContext:
       privileged: true
       capabilities:
-        add: ["SYS_ADMIN", "BPF", "SYS_PTRACE"]
+        add:
+          - SYS_ADMIN      # Required for BPF
+          - BPF            # Required for BPF
+          - SYS_PTRACE     # Required for process memory access
+          - PERFMON        # Required for perf events
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "256Mi"
+        cpu: "500m"
+    volumeMounts:
+    - name: x00-config
+      mountPath: /etc/x00
+      readOnly: true
+    - name: x00-secrets-runtime
+      mountPath: /run/x00/secrets
+    - name: x00-secrets-source
+      mountPath: /var/run/secrets/x00
+      readOnly: true
+    - name: sys-kernel-debug
+      mountPath: /sys/kernel/debug
+      readOnly: true
+    - name: sys-kernel-btf
+      mountPath: /sys/kernel/btf
+      readOnly: true
+    - name: bpf-maps
+      mountPath: /sys/fs/bpf
+
+  volumes:
+  - name: x00-config
+    configMap:
+      name: x00-config
+  - name: x00-secrets-runtime
+    emptyDir:
+      medium: Memory
+      sizeLimit: 10Mi
+  - name: x00-secrets-source
+    projected:
+      sources:
+      - secret:
+          name: myapp-db-credentials
+          items:
+          - key: password
+            path: myapp-db-credentials/password
+      - secret:
+          name: myapp-api-key
+          items:
+          - key: api-key
+            path: myapp-api-key/api-key
+  - name: sys-kernel-debug
+    hostPath:
+      path: /sys/kernel/debug
+      type: Directory
+  - name: sys-kernel-btf
+    hostPath:
+      path: /sys/kernel/btf
+      type: DirectoryOrCreate
+  - name: bpf-maps
+    hostPath:
+      path: /sys/fs/bpf
+      type: DirectoryOrCreate

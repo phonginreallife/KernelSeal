@@ -1,0 +1,63 @@
+# X00 Default Configuration
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: x00-config
+  namespace: x00-system
+  labels:
+    app.kubernetes.io/name: x00
+data:
+  config.yaml: |
+    # X00 Configuration
+    # See documentation for all available options
+    
+    version: v1
+    
+    # Policy settings - how X00 enforces secret protection
+    policy:
+      # Mode: disabled, audit (log only), enforce (block and log)
+      mode: enforce
+      
+      # Block read access to /proc/<pid>/environ for protected processes
+      blockEnviron: true
+      
+      # Block read access to /proc/<pid>/mem for protected processes
+      blockMem: true
+      
+      # Block read access to /proc/<pid>/maps for protected processes
+      blockMaps: false
+      
+      # Block ptrace attach to protected processes
+      blockPtrace: true
+      
+      # Allow a process to read its own /proc files
+      allowSelfRead: true
+      
+      # Audit all accesses to protected resources (even if allowed)
+      auditAll: false
+    
+    # Secret bindings - define which secrets go to which processes
+    # Secrets are injected when a matching process starts
+    secrets: []
+    # Example:
+    # - name: web-app-secrets
+    #   selector:
+    #     binary: "nginx"      # Match by binary name
+    #     # container: "web"   # Match by container name  
+    #     # labels:            # Match by pod labels
+    #     #   app: web
+    #     # namespace: production
+    #   secretRefs:
+    #     - name: SSL_CERT_PASSWORD
+    #       source:
+    #         secretKeyRef:
+    #           name: ssl-certs
+    #           key: password
+    
+    # Monitoring configuration
+    monitoring:
+      enabled: true
+      metricsPort: 9090
+      logLevel: info
+      auditLog: /var/log/x00/audit.log

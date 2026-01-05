@@ -1,0 +1,164 @@
+# X00 DaemonSet - Run X00 on every node (alternative to sidecar pattern)
+# Use this when you want node-wide secret protection
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: x00
+  namespace: x00-system
+  labels:
+    app.kubernetes.io/name: x00
+    app.kubernetes.io/component: security-agent
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: x00
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: x00
+        app.kubernetes.io/component: security-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      serviceAccountName: x00-controller
+      hostPID: true          # Required to monitor all processes
+      hostNetwork: false     # Not needed
+      
+      tolerations:
+      # Run on all nodes including control plane
+      - operator: Exists
+        effect: NoSchedule
+      - operator: Exists
+        effect: NoExecute
+      
+      priorityClassName: system-node-critical
+      
+      containers:
+      - name: x00
+        image: your-registry/x00:latest
+        imagePullPolicy: Always
+        args:
+          - "-config=/etc/x00/config.yaml"
+        
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+              - SYS_ADMIN
+              - BPF
+              - SYS_PTRACE
+              - PERFMON
+              - NET_ADMIN
+        
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        
+        ports:
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: metrics
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: metrics
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        
+        volumeMounts:
+        - name: config
+          mountPath: /etc/x00
+          readOnly: true
+        - name: secrets-runtime
+          mountPath: /run/x00/secrets
+        - name: sys-kernel-debug
+          mountPath: /sys/kernel/debug
+          readOnly: true
+        - name: sys-kernel-btf
+          mountPath: /sys/kernel/btf
+          readOnly: true
+        - name: bpf-maps
+          mountPath: /sys/fs/bpf
+        - name: cgroup
+          mountPath: /sys/fs/cgroup
+          readOnly: true
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+      
+      volumes:
+      - name: config
+        configMap:
+          name: x00-config
+      - name: secrets-runtime
+        hostPath:
+          path: /run/x00/secrets
+          type: DirectoryOrCreate
+      - name: sys-kernel-debug
+        hostPath:
+          path: /sys/kernel/debug
+          type: Directory
+      - name: sys-kernel-btf
+        hostPath:
+          path: /sys/kernel/btf
+          type: DirectoryOrCreate
+      - name: bpf-maps
+        hostPath:
+          path: /sys/fs/bpf
+          type: DirectoryOrCreate
+      - name: cgroup
+        hostPath:
+          path: /sys/fs/cgroup
+          type: Directory
+      - name: proc
+        hostPath:
+          path: /proc
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: x00-metrics
+  namespace: x00-system
+  labels:
+    app.kubernetes.io/name: x00
+spec:
+  selector:
+    app.kubernetes.io/name: x00
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+  type: ClusterIP
