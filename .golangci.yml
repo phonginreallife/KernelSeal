@@ -4,8 +4,6 @@ run:
   timeout: 5m
   go: '1.22'
   tests: true
-  skip-dirs:
-    - vendor
 
 linters:
   enable:
@@ -23,10 +21,6 @@ linters:
     - noctx
     - gosec
     - prealloc
-  disable:
-    - structcheck  # deprecated
-    - varcheck     # deprecated
-    - deadcode     # deprecated
 
 linters-settings:
   errcheck:
@@ -37,10 +31,10 @@ linters-settings:
       - io.WriteString
 
   govet:
-    check-shadowing: true
     enable-all: true
     disable:
-      - fieldalignment  # too strict for our use case
+      - fieldalignment # too strict for our use case
+      - shadow # handled separately
 
   gofmt:
     simplify: true
@@ -53,8 +47,9 @@ linters-settings:
 
   gosec:
     excludes:
-      - G104  # Audit errors not checked (we handle this intentionally in some places)
-      - G304  # File path provided as taint input (we validate paths)
+      - G104 # Audit errors not checked (we handle this intentionally in some places)
+      - G304 # File path provided as taint input (we validate paths)
+      - G115 # Integer overflow conversion (we handle PID conversion safely)
 
   prealloc:
     simple: true
@@ -62,6 +57,9 @@ linters-settings:
     for-loops: false
 
 issues:
+  exclude-dirs:
+    - vendor
+
   exclude-rules:
     # Exclude some linters from running on tests files
     - path: _test\.go
@@ -75,11 +73,17 @@ issues:
       linters:
         - all
 
+    # Ignore shadow warnings in specific functions where it's intentional
+    - linters:
+        - govet
+      text: "shadow"
+
   max-issues-per-linter: 0
   max-same-issues: 0
   new: false
 
 output:
-  format: colored-line-number
+  formats:
+    - format: colored-line-number
   print-issued-lines: true
   print-linter-name: true

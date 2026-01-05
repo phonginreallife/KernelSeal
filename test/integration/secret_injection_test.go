@@ -80,8 +80,8 @@ func TestSecretFile_Permissions(t *testing.T) {
 
 	// Create a test secret file
 	secretFile := filepath.Join(testDir, "test-secret")
-	if err := os.WriteFile(secretFile, []byte("secret-value"), 0400); err != nil {
-		t.Fatalf("Failed to create secret file: %v", err)
+	if writeErr := os.WriteFile(secretFile, []byte("secret-value"), 0400); writeErr != nil {
+		t.Fatalf("Failed to create secret file: %v", writeErr)
 	}
 
 	// Verify file permissions

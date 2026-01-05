@@ -23,23 +23,22 @@ type PolicyManager struct {
 	configPath     string
 	secretInjector *secrets.Injector
 	mu             sync.RWMutex
-	
+
 	// Callbacks for policy updates
 	onPolicyUpdate func(types.PolicyConfig)
-	onSecretsUpdate func(binaryName string, secrets []secrets.Secret)
 }
 
 // X00Config represents the complete X00 configuration
 type X00Config struct {
-	Version    string            `yaml:"version" json:"version"`
-	Policy     PolicySpec        `yaml:"policy" json:"policy"`
-	Secrets    []SecretBinding   `yaml:"secrets" json:"secrets"`
-	Monitoring MonitoringConfig  `yaml:"monitoring" json:"monitoring"`
+	Version    string           `yaml:"version" json:"version"`
+	Policy     PolicySpec       `yaml:"policy" json:"policy"`
+	Secrets    []SecretBinding  `yaml:"secrets" json:"secrets"`
+	Monitoring MonitoringConfig `yaml:"monitoring" json:"monitoring"`
 }
 
 // PolicySpec defines the LSM policy settings
 type PolicySpec struct {
-	Mode          string `yaml:"mode" json:"mode"`                     // disabled, audit, enforce
+	Mode          string `yaml:"mode" json:"mode"` // disabled, audit, enforce
 	BlockEnviron  bool   `yaml:"blockEnviron" json:"blockEnviron"`
 	BlockMem      bool   `yaml:"blockMem" json:"blockMem"`
 	BlockMaps     bool   `yaml:"blockMaps" json:"blockMaps"`
@@ -50,9 +49,9 @@ type PolicySpec struct {
 
 // SecretBinding binds secrets to specific processes
 type SecretBinding struct {
-	Name        string          `yaml:"name" json:"name"`               // Binding name
-	Selector    ProcessSelector `yaml:"selector" json:"selector"`       // How to select processes
-	SecretRefs  []SecretRef     `yaml:"secretRefs" json:"secretRefs"`   // References to secrets
+	Name       string          `yaml:"name" json:"name"`             // Binding name
+	Selector   ProcessSelector `yaml:"selector" json:"selector"`     // How to select processes
+	SecretRefs []SecretRef     `yaml:"secretRefs" json:"secretRefs"` // References to secrets
 }
 
 // ProcessSelector defines how to select target processes
@@ -66,8 +65,8 @@ type ProcessSelector struct {
 
 // SecretRef references a secret source
 type SecretRef struct {
-	Name   string       `yaml:"name" json:"name"`                       // Environment variable name
-	Source SecretSource `yaml:"source" json:"source"`                   // Secret source
+	Name   string       `yaml:"name" json:"name"`     // Environment variable name
+	Source SecretSource `yaml:"source" json:"source"` // Secret source
 }
 
 // SecretSource defines where to get the secret value
@@ -164,12 +163,12 @@ func (pm *PolicyManager) LoadConfig(path string) error {
 	pm.configPath = path
 	pm.config = config
 	pm.mu.Unlock()
-	
+
 	log.Printf("📋 Loaded X00 configuration from %s", path)
-	
+
 	// Apply policy (these methods handle their own locking)
 	pm.applyPolicy()
-	
+
 	// Load secrets
 	pm.loadSecrets()
 
@@ -189,7 +188,7 @@ func (pm *PolicyManager) loadConfigFromFile(path string) (*X00Config, error) {
 	}
 
 	config := DefaultConfig()
-	
+
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".yaml", ".yml":
@@ -243,16 +242,16 @@ func (pm *PolicyManager) loadConfigFromDir(dir string) (*X00Config, error) {
 
 func (pm *PolicyManager) applyPolicy() {
 	policy := pm.GetBPFPolicy()
-	
+
 	pm.mu.RLock()
 	cb := pm.onPolicyUpdate
 	mode := pm.config.Policy.Mode
 	pm.mu.RUnlock()
-	
+
 	if cb != nil {
 		cb(policy)
 	}
-	
+
 	log.Printf("🔧 Policy applied: mode=%s", mode)
 }
 
@@ -263,25 +262,25 @@ func (pm *PolicyManager) loadSecrets() {
 
 	for _, binding := range pm.config.Secrets {
 		secretsList := make([]secrets.Secret, 0, len(binding.SecretRefs))
-		
+
 		for _, ref := range binding.SecretRefs {
 			value, err := pm.resolveSecretValue(ref.Source)
 			if err != nil {
 				log.Printf("⚠️  Failed to resolve secret %s: %v", ref.Name, err)
 				continue
 			}
-			
+
 			secretsList = append(secretsList, secrets.Secret{
 				Name:  ref.Name,
 				Value: value,
 			})
 		}
-		
+
 		// Register secrets based on selector
 		if binding.Selector.Binary != "" {
 			pm.secretInjector.RegisterSecrets(binding.Selector.Binary, secretsList)
 		}
-		
+
 		// TODO: Handle other selector types (container, labels, namespace, cgroupPath)
 	}
 }
@@ -309,20 +308,20 @@ func (pm *PolicyManager) resolveSecretValue(source SecretSource) (string, error)
 	if source.SecretKeyRef != nil {
 		// For now, check if the secret is mounted as a file
 		// This is the typical pattern when using K8s secrets as volume mounts
-		mountPath := fmt.Sprintf("/var/run/secrets/x00/%s/%s", 
+		mountPath := fmt.Sprintf("/var/run/secrets/x00/%s/%s",
 			source.SecretKeyRef.Name, source.SecretKeyRef.Key)
 		if data, err := os.ReadFile(mountPath); err == nil {
 			return strings.TrimSpace(string(data)), nil
 		}
-		
+
 		// Alternative: read from standard k8s secret mount
-		altPath := fmt.Sprintf("/var/run/secrets/kubernetes.io/serviceaccount/%s", 
+		altPath := fmt.Sprintf("/var/run/secrets/kubernetes.io/serviceaccount/%s",
 			source.SecretKeyRef.Key)
 		if data, err := os.ReadFile(altPath); err == nil {
 			return strings.TrimSpace(string(data)), nil
 		}
-		
-		return "", fmt.Errorf("kubernetes secret %s/%s not found", 
+
+		return "", fmt.Errorf("kubernetes secret %s/%s not found",
 			source.SecretKeyRef.Name, source.SecretKeyRef.Key)
 	}
 

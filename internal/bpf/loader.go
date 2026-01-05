@@ -82,8 +82,8 @@ func (m *Manager) LoadExecMonitor(objectPath string) error {
 		return fmt.Errorf("failed to load exec monitor spec: %w", err)
 	}
 
-	if err := spec.LoadAndAssign(&m.execObjs, nil); err != nil {
-		return fmt.Errorf("failed to load exec monitor objects: %w", err)
+	if loadErr := spec.LoadAndAssign(&m.execObjs, nil); loadErr != nil {
+		return fmt.Errorf("failed to load exec monitor objects: %w", loadErr)
 	}
 
 	// Attach to sys_enter_execve tracepoint
@@ -123,32 +123,32 @@ func (m *Manager) LoadLSM(objectPath string) error {
 		return fmt.Errorf("failed to load LSM spec: %w", err)
 	}
 
-	if err := spec.LoadAndAssign(&m.lsmObjs, nil); err != nil {
+	if loadErr := spec.LoadAndAssign(&m.lsmObjs, nil); loadErr != nil {
 		// LSM programs may fail to load if BPF_LSM is not enabled
-		log.Printf("⚠️  LSM programs not loaded (BPF-LSM may not be enabled): %v", err)
+		log.Printf("⚠️  LSM programs not loaded (BPF-LSM may not be enabled): %v", loadErr)
 		return nil
 	}
 
 	// Attach LSM hooks
 	if m.lsmObjs.X00FileOpen != nil {
-		lsmLink, err := link.AttachLSM(link.LSMOptions{
+		fileOpenLink, attachErr := link.AttachLSM(link.LSMOptions{
 			Program: m.lsmObjs.X00FileOpen,
 		})
-		if err != nil {
-			log.Printf("⚠️  Failed to attach file_open LSM: %v", err)
+		if attachErr != nil {
+			log.Printf("⚠️  Failed to attach file_open LSM: %v", attachErr)
 		} else {
-			m.lsmLinks = append(m.lsmLinks, lsmLink)
+			m.lsmLinks = append(m.lsmLinks, fileOpenLink)
 		}
 	}
 
 	if m.lsmObjs.X00PtraceAccessCheck != nil {
-		lsmLink, err := link.AttachLSM(link.LSMOptions{
+		ptraceLink, attachErr := link.AttachLSM(link.LSMOptions{
 			Program: m.lsmObjs.X00PtraceAccessCheck,
 		})
-		if err != nil {
-			log.Printf("⚠️  Failed to attach ptrace LSM: %v", err)
+		if attachErr != nil {
+			log.Printf("⚠️  Failed to attach ptrace LSM: %v", attachErr)
 		} else {
-			m.lsmLinks = append(m.lsmLinks, lsmLink)
+			m.lsmLinks = append(m.lsmLinks, ptraceLink)
 		}
 	}
 

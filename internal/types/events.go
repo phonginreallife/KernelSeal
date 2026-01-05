@@ -82,7 +82,7 @@ type ExecEvent struct {
 	PPID      uint32
 	UID       uint32
 	GID       uint32
-	Pad0      uint32   // padding to align CgroupID to 8 bytes
+	Pad0      uint32 // padding to align CgroupID to 8 bytes
 	CgroupID  uint64
 	EventType EventType
 	Pad1      [3]byte // padding after EventType

@@ -232,20 +232,22 @@ func (i *Injector) injectViaSecretFile(pid uint32, fd int) error {
 
 	// Read from the memfd
 	var buf [4096]byte
-	n, err := syscall.Pread(fd, buf[:], 0)
-	if err != nil {
-		return fmt.Errorf("pread from memfd failed: %w", err)
+	n, readErr := syscall.Pread(fd, buf[:], 0)
+	if readErr != nil {
+		return fmt.Errorf("pread from memfd failed: %w", readErr)
 	}
 
 	// Write to the secret file with restrictive permissions
-	if err := os.WriteFile(secretPath, buf[:n], 0400); err != nil {
-		return fmt.Errorf("failed to write secret file: %w", err)
+	if writeErr := os.WriteFile(secretPath, buf[:n], 0400); writeErr != nil {
+		return fmt.Errorf("failed to write secret file: %w", writeErr)
 	}
 
 	// Change ownership to the target process's UID
-	uid, gid, err := getProcessUIDGID(pid)
-	if err == nil {
-		os.Chown(secretPath, uid, gid)
+	uid, gid, uidErr := getProcessUIDGID(pid)
+	if uidErr == nil {
+		if chownErr := os.Chown(secretPath, uid, gid); chownErr != nil {
+			log.Printf("⚠️ Failed to chown secret file: %v", chownErr)
+		}
 	}
 
 	log.Printf("📂 Secrets written to %s for PID %d", secretPath, pid)
@@ -320,13 +322,17 @@ func getProcessUIDGID(pid uint32) (int, int, error) {
 		if strings.HasPrefix(line, "Uid:") {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {
-				uid, _ = strconv.Atoi(fields[1])
+				if val, err := strconv.Atoi(fields[1]); err == nil {
+					uid = val
+				}
 			}
 		}
 		if strings.HasPrefix(line, "Gid:") {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {
-				gid, _ = strconv.Atoi(fields[1])
+				if val, err := strconv.Atoi(fields[1]); err == nil {
+					gid = val
+				}
 			}
 		}
 	}

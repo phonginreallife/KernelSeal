@@ -71,7 +71,8 @@ func main() {
 	}
 
 	// Allow our own PID to access protected files
-	ownPID := uint32(os.Getpid())
+	// #nosec G115 - PID is always positive and fits in uint32
+	ownPID := uint32(os.Getpid()) //nolint:gosec
 	if err := bpfManager.AllowPID(ownPID); err != nil {
 		log.Printf("⚠️  Failed to allow own PID: %v", err)
 	}
@@ -158,7 +159,7 @@ func handleLSMEvent(event *types.LSMEvent) {
 		eventStr = "BLOCKED"
 	}
 
-	accessStr := types.AccessType(event.AccessType).String()
+	accessStr := event.AccessType.String()
 
 	log.Printf("🛡️  LSM %s: PID=%d attempted %s access to PID=%d (%s)",
 		eventStr, event.PID, accessStr, event.TargetPID, event.GetComm())

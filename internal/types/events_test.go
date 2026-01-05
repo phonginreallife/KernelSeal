@@ -227,8 +227,30 @@ func TestPolicyConfig_StructLayout(t *testing.T) {
 		Reserved:      0,
 	}
 
+	// Verify all fields are set correctly
 	if policy.EnforceMode != ModeEnforce {
 		t.Error("EnforceMode not set correctly")
+	}
+	if policy.BlockEnviron != 1 {
+		t.Error("BlockEnviron not set correctly")
+	}
+	if policy.BlockMem != 1 {
+		t.Error("BlockMem not set correctly")
+	}
+	if policy.BlockMaps != 0 {
+		t.Error("BlockMaps not set correctly")
+	}
+	if policy.BlockPtrace != 1 {
+		t.Error("BlockPtrace not set correctly")
+	}
+	if policy.AllowSelfRead != 1 {
+		t.Error("AllowSelfRead not set correctly")
+	}
+	if policy.AuditAll != 0 {
+		t.Error("AuditAll not set correctly")
+	}
+	if policy.Reserved != 0 {
+		t.Error("Reserved not set correctly")
 	}
 }
 
