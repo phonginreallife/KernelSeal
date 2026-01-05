@@ -87,8 +87,17 @@ static __always_inline int should_monitor_binary(const char *comm) {
 }
 
 // Tracepoint: sys_enter_execve - Called when execve() is invoked
+// This captures ALL execve events - used when binary filtering is DISABLED
 SEC("tracepoint/syscalls/sys_enter_execve")
 int handle_sys_enter_execve(struct trace_event_raw_sys_enter *ctx) {
+    __u32 key = 0;
+    __u8 *filter_enabled = bpf_map_lookup_elem(&binary_filter_enabled, &key);
+    
+    // If binary filtering is enabled, skip this handler
+    // (sched_process_exec will handle filtered events)
+    if (filter_enabled && *filter_enabled == 1)
+        return 0;
+    
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
     __u32 tgid = pid_tgid & 0xFFFFFFFF;
@@ -98,46 +107,6 @@ int handle_sys_enter_execve(struct trace_event_raw_sys_enter *ctx) {
     
     // Check cgroup filter first (if enabled)
     if (!should_monitor_cgroup(cgid))
-        return 0;
-    
-    // Get the binary name from filename argument for filtering
-    // We need to extract the basename for comparison
-    const char *filename = (const char *)ctx->args[0];
-    char binary_name[16] = {};
-    
-    if (filename) {
-        // Read the full path
-        char full_path[256];
-        int ret = bpf_probe_read_user_str(full_path, sizeof(full_path), filename);
-        if (ret > 0) {
-            // Find the last '/' to get basename
-            int last_slash = -1;
-            #pragma unroll
-            for (int i = 0; i < 255 && i < ret; i++) {
-                if (full_path[i] == '/')
-                    last_slash = i;
-                if (full_path[i] == '\0')
-                    break;
-            }
-            
-            // Copy basename to binary_name
-            int start = last_slash + 1;
-            #pragma unroll
-            for (int i = 0; i < 15; i++) {
-                int idx = start + i;
-                if (idx < 256 && full_path[idx] != '\0') {
-                    binary_name[i] = full_path[idx];
-                } else {
-                    binary_name[i] = '\0';
-                    break;
-                }
-            }
-            binary_name[15] = '\0';
-        }
-    }
-    
-    // Check binary filter (if enabled) - filter in kernel space!
-    if (!should_monitor_binary(binary_name))
         return 0;
     
     // Check for duplicate (same PID already being tracked)
@@ -181,12 +150,92 @@ int handle_sys_enter_execve(struct trace_event_raw_sys_enter *ctx) {
     // Get command name
     bpf_get_current_comm(&event->comm, sizeof(event->comm));
     
-    // Copy filename
+    // Copy filename from execve argument
+    const char *filename = (const char *)ctx->args[0];
     if (filename) {
         bpf_probe_read_user_str(event->filename, sizeof(event->filename), filename);
     } else {
         event->filename[0] = '\0';
     }
+    
+    bpf_ringbuf_submit(event, 0);
+    
+    return 0;
+}
+
+// Tracepoint: sched_process_exec - Called AFTER exec completes
+// Used when binary filtering is ENABLED - filters by the NEW comm (binary name)
+SEC("tracepoint/sched/sched_process_exec")
+int handle_sched_process_exec(void *ctx) {
+    __u32 key = 0;
+    __u8 *filter_enabled = bpf_map_lookup_elem(&binary_filter_enabled, &key);
+    
+    // If binary filtering is NOT enabled, skip this handler
+    // (sys_enter_execve handles all events)
+    if (!filter_enabled || *filter_enabled == 0)
+        return 0;
+    
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = pid_tgid >> 32;
+    __u32 tgid = pid_tgid & 0xFFFFFFFF;
+    
+    // Get cgroup ID
+    __u64 cgid = bpf_get_current_cgroup_id();
+    
+    // Check cgroup filter
+    if (!should_monitor_cgroup(cgid))
+        return 0;
+    
+    // Get the NEW command name (after exec)
+    char comm[16];
+    bpf_get_current_comm(&comm, sizeof(comm));
+    
+    // Check binary filter - this is where kernel-side filtering happens!
+    if (!should_monitor_binary(comm))
+        return 0;
+    
+    // Check for duplicate
+    __u64 *existing = bpf_map_lookup_elem(&seen_pids, &pid);
+    __u64 now = bpf_ktime_get_ns();
+    
+    if (existing) {
+        if (now - *existing < 100000000)
+            return 0;
+    }
+    
+    bpf_map_update_elem(&seen_pids, &pid, &now, BPF_ANY);
+    
+    // If we reach here, this binary should be monitored
+    struct x00_exec_event *event;
+    event = bpf_ringbuf_reserve(&exec_events, sizeof(*event), 0);
+    if (!event)
+        return 0;
+    
+    event->timestamp = now;
+    event->pid = pid;
+    event->tgid = tgid;
+    event->uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+    event->gid = bpf_get_current_uid_gid() >> 32;
+    event->cgroup_id = cgid;
+    event->event_type = X00_EVENT_EXEC;
+    
+    // Get parent PID
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    struct task_struct *parent;
+    bpf_core_read(&parent, sizeof(parent), &task->real_parent);
+    if (parent) {
+        bpf_core_read(&event->ppid, sizeof(event->ppid), &parent->pid);
+    } else {
+        event->ppid = 0;
+    }
+    
+    // Copy comm (the binary name we matched on)
+    __builtin_memcpy(event->comm, comm, sizeof(comm));
+    
+    // For sched_process_exec, we use comm as filename since we don't have easy access
+    // to the full path in this context. User-space will resolve if needed.
+    __builtin_memcpy(event->filename, comm, sizeof(comm));
+    event->filename[15] = '\0';
     
     bpf_ringbuf_submit(event, 0);
     

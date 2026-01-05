@@ -36,14 +36,15 @@ type Manager struct {
 
 // execObjects holds the exec monitor BPF objects
 type execObjects struct {
-	HandleSysEnterExecve *ebpf.Program `ebpf:"handle_sys_enter_execve"`
-	HandleSchedProcExit  *ebpf.Program `ebpf:"handle_sched_process_exit"`
-	ExecEvents           *ebpf.Map     `ebpf:"exec_events"`
-	SeenPids             *ebpf.Map     `ebpf:"seen_pids"`
-	TargetCgroups        *ebpf.Map     `ebpf:"target_cgroups"`
-	CgroupFilterEnabled  *ebpf.Map     `ebpf:"cgroup_filter_enabled"`
-	TargetBinaries       *ebpf.Map     `ebpf:"target_binaries"`
-	BinaryFilterEnabled  *ebpf.Map     `ebpf:"binary_filter_enabled"`
+	HandleSysEnterExecve  *ebpf.Program `ebpf:"handle_sys_enter_execve"`
+	HandleSchedProcExec   *ebpf.Program `ebpf:"handle_sched_process_exec"`
+	HandleSchedProcExit   *ebpf.Program `ebpf:"handle_sched_process_exit"`
+	ExecEvents            *ebpf.Map     `ebpf:"exec_events"`
+	SeenPids              *ebpf.Map     `ebpf:"seen_pids"`
+	TargetCgroups         *ebpf.Map     `ebpf:"target_cgroups"`
+	CgroupFilterEnabled   *ebpf.Map     `ebpf:"cgroup_filter_enabled"`
+	TargetBinaries        *ebpf.Map     `ebpf:"target_binaries"`
+	BinaryFilterEnabled   *ebpf.Map     `ebpf:"binary_filter_enabled"`
 }
 
 // lsmObjects holds the LSM BPF objects
@@ -88,12 +89,19 @@ func (m *Manager) LoadExecMonitor(objectPath string) error {
 		return fmt.Errorf("failed to load exec monitor objects: %w", loadErr)
 	}
 
-	// Attach to sys_enter_execve tracepoint
+	// Attach to sys_enter_execve tracepoint (used when binary filter is disabled)
 	tpExec, err := link.Tracepoint("syscalls", "sys_enter_execve", m.execObjs.HandleSysEnterExecve, nil)
 	if err != nil {
 		return fmt.Errorf("failed to attach execve tracepoint: %w", err)
 	}
 	m.execLinks = append(m.execLinks, tpExec)
+
+	// Attach to sched_process_exec tracepoint (used when binary filter is enabled)
+	tpSchedExec, err := link.Tracepoint("sched", "sched_process_exec", m.execObjs.HandleSchedProcExec, nil)
+	if err != nil {
+		return fmt.Errorf("failed to attach sched_process_exec tracepoint: %w", err)
+	}
+	m.execLinks = append(m.execLinks, tpSchedExec)
 
 	// Attach to sched_process_exit tracepoint
 	tpExit, err := link.Tracepoint("sched", "sched_process_exit", m.execObjs.HandleSchedProcExit, nil)
