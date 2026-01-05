@@ -1,0 +1,104 @@
+# Compiled binaries and objects
+build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+x00
+
+# BPF compiled objects (keep source, ignore compiled unless in bpf/)
+*.bpf.o
+!bpf/*.bpf.o.example
+
+# Generated kernel headers (large file ~3MB, regenerate with: bpftool btf dump file /sys/kernel/btf/vmlinux format c > bpf/vmlinux.h)
+bpf/vmlinux.h
+
+# Test binary and coverage
+*.test
+coverage.out
+coverage.html
+*.coverprofile
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment and secrets - NEVER commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+id_dsa*
+id_ecdsa*
+*.secret
+secrets/
+!secrets/.gitkeep
+
+# Kubernetes secrets and sensitive configs
+kubeconfig
+*.kubeconfig
+*-secret.yaml
+*-secrets.yaml
+
+# Temporary and log files
+*.log
+*.tmp
+tmp/
+temp/
+logs/
+
+# Debug files
+debug/
+*.debug
+core
+core.*
+
+# Vendor (if not committing dependencies)
+# vendor/
+
+# Docker
+.docker/
+
+# Security scanning outputs
+*.sarif
+gosec-results.*
+trivy-results.*
+scan-results/
+
+# Terraform state (if using IaC)
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Accidentally created files
+1cd
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Linux
+.fuse_hidden*
+.Trash-*
+.nfs*
+
+# Miscellaneous
+*.bak
+*.orig
+*.backup
