@@ -29,11 +29,19 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Build BPF programs
+      - name: Install BPF build dependencies
         run: |
-          docker run --rm -v ${{ github.workspace }}:/app -w /app \
-            docker.io/cilium/ebpf-builder:1698931239 \
-            make bpf
+          sudo apt-get update
+          sudo apt-get install -y clang llvm libbpf-dev linux-headers-$(uname -r) make
+
+      - name: Generate vmlinux.h
+        run: |
+          if [ ! -f bpf/vmlinux.h ]; then
+            bpftool btf dump file /sys/kernel/btf/vmlinux format c > bpf/vmlinux.h
+          fi
+
+      - name: Build BPF programs
+        run: make bpf
 
       - name: Run tests
         run: go test -v ./...
