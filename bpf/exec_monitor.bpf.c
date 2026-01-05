@@ -187,7 +187,8 @@ int handle_sched_process_exec(void *ctx) {
         return 0;
     
     // Get the NEW command name (after exec)
-    char comm[16];
+    // IMPORTANT: Zero-initialize to ensure consistent key for map lookup
+    char comm[16] = {};
     bpf_get_current_comm(&comm, sizeof(comm));
     
     // Check binary filter - this is where kernel-side filtering happens!
