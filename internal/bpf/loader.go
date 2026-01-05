@@ -42,6 +42,8 @@ type execObjects struct {
 	SeenPids             *ebpf.Map     `ebpf:"seen_pids"`
 	TargetCgroups        *ebpf.Map     `ebpf:"target_cgroups"`
 	CgroupFilterEnabled  *ebpf.Map     `ebpf:"cgroup_filter_enabled"`
+	TargetBinaries       *ebpf.Map     `ebpf:"target_binaries"`
+	BinaryFilterEnabled  *ebpf.Map     `ebpf:"binary_filter_enabled"`
 }
 
 // lsmObjects holds the LSM BPF objects
@@ -254,6 +256,84 @@ func (m *Manager) EnableCgroupFilter(enabled bool) error {
 	}
 
 	return nil
+}
+
+// AddTargetBinary adds a binary name to the kernel-side filter list
+// When binary filtering is enabled, only these binaries will be monitored
+func (m *Manager) AddTargetBinary(binaryName string) error {
+	if m.execObjs.TargetBinaries == nil {
+		return errors.New("exec monitor not loaded")
+	}
+
+	// Create a fixed-size key (16 bytes, matching BPF map key size)
+	key := make([]byte, 16)
+	copy(key, binaryName)
+
+	value := uint8(1)
+	if err := m.execObjs.TargetBinaries.Put(key, value); err != nil {
+		return fmt.Errorf("failed to add target binary %s: %w", binaryName, err)
+	}
+
+	log.Printf("🎯 Added target binary for kernel filtering: %s", binaryName)
+	return nil
+}
+
+// RemoveTargetBinary removes a binary name from the kernel-side filter list
+func (m *Manager) RemoveTargetBinary(binaryName string) error {
+	if m.execObjs.TargetBinaries == nil {
+		return errors.New("exec monitor not loaded")
+	}
+
+	key := make([]byte, 16)
+	copy(key, binaryName)
+
+	if err := m.execObjs.TargetBinaries.Delete(key); err != nil {
+		return fmt.Errorf("failed to remove target binary %s: %w", binaryName, err)
+	}
+
+	return nil
+}
+
+// EnableBinaryFilter enables kernel-side binary filtering
+// When enabled, only processes matching target_binaries will generate events
+func (m *Manager) EnableBinaryFilter(enabled bool) error {
+	if m.execObjs.BinaryFilterEnabled == nil {
+		return errors.New("exec monitor not loaded")
+	}
+
+	key := uint32(0)
+	value := uint8(0)
+	if enabled {
+		value = 1
+	}
+
+	if err := m.execObjs.BinaryFilterEnabled.Put(key, value); err != nil {
+		return fmt.Errorf("failed to set binary filter: %w", err)
+	}
+
+	if enabled {
+		log.Println("🔍 Kernel-side binary filtering ENABLED - only configured binaries will be monitored")
+	} else {
+		log.Println("🔍 Kernel-side binary filtering DISABLED - all processes will be monitored")
+	}
+
+	return nil
+}
+
+// GetTargetBinaryCount returns the number of target binaries configured
+func (m *Manager) GetTargetBinaryCount() int {
+	if m.execObjs.TargetBinaries == nil {
+		return 0
+	}
+
+	count := 0
+	iter := m.execObjs.TargetBinaries.Iterate()
+	var key [16]byte
+	var value uint8
+	for iter.Next(&key, &value) {
+		count++
+	}
+	return count
 }
 
 // Start begins processing BPF events

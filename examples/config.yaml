@@ -29,6 +29,12 @@ policy:
   
   # Log all accesses (even allowed ones) for audit purposes
   auditAll: false
+  
+  # Kernel-side binary filtering (RECOMMENDED for production)
+  # When enabled, X00 only monitors processes matching configured binaries
+  # This significantly reduces CPU overhead on busy systems
+  # When disabled, X00 monitors ALL process executions (higher overhead)
+  kernelBinaryFilter: true
 
 secrets:
   # Example: Inject database credentials into PostgreSQL client

@@ -65,6 +65,28 @@ func main() {
 		log.Fatalf("❌ Failed to load exec monitor: %v", err)
 	}
 
+	// Configure kernel-side binary filtering
+	// This ensures we only process events for configured binaries
+	targetBinaries := policyManager.GetTargetBinaries()
+	kernelFilterEnabled := policyManager.IsKernelBinaryFilterEnabled()
+
+	if kernelFilterEnabled && len(targetBinaries) > 0 {
+		for _, binary := range targetBinaries {
+			if err := bpfManager.AddTargetBinary(binary); err != nil {
+				log.Printf("⚠️  Failed to add target binary %s: %v", binary, err)
+			}
+		}
+		// Enable kernel-side filtering
+		if err := bpfManager.EnableBinaryFilter(true); err != nil {
+			log.Printf("⚠️  Failed to enable binary filter: %v", err)
+		}
+		log.Printf("🎯 Kernel-side filtering enabled for %d binaries: %v", len(targetBinaries), targetBinaries)
+	} else if !kernelFilterEnabled {
+		log.Println("🔍 Kernel-side binary filtering DISABLED by config - monitoring all processes")
+	} else {
+		log.Println("⚠️  No target binaries configured - monitoring all processes (not recommended for production)")
+	}
+
 	// Try to load LSM (may not be available on all kernels)
 	if err := bpfManager.LoadLSM(*lsmPath); err != nil {
 		log.Printf("⚠️  LSM not loaded: %v", err)

@@ -45,6 +45,11 @@ type PolicySpec struct {
 	BlockPtrace   bool   `yaml:"blockPtrace" json:"blockPtrace"`
 	AllowSelfRead bool   `yaml:"allowSelfRead" json:"allowSelfRead"`
 	AuditAll      bool   `yaml:"auditAll" json:"auditAll"`
+
+	// Kernel-side filtering options
+	// When enabled, only processes matching configured binaries will be monitored
+	// This significantly reduces overhead for systems with many processes
+	KernelBinaryFilter bool `yaml:"kernelBinaryFilter" json:"kernelBinaryFilter"`
 }
 
 // SecretBinding binds secrets to specific processes
@@ -115,13 +120,14 @@ func DefaultConfig() *X00Config {
 	return &X00Config{
 		Version: "v1",
 		Policy: PolicySpec{
-			Mode:          "enforce",
-			BlockEnviron:  true,
-			BlockMem:      true,
-			BlockMaps:     false,
-			BlockPtrace:   true,
-			AllowSelfRead: true,
-			AuditAll:      false,
+			Mode:               "enforce",
+			BlockEnviron:       true,
+			BlockMem:           true,
+			BlockMaps:          false,
+			BlockPtrace:        true,
+			AllowSelfRead:      true,
+			AuditAll:           false,
+			KernelBinaryFilter: true, // Enable kernel-side filtering by default
 		},
 		Secrets: []SecretBinding{},
 		Monitoring: MonitoringConfig{
@@ -374,6 +380,32 @@ func (pm *PolicyManager) ShouldInjectSecrets(binaryName string, cgroupID uint64)
 		return nil
 	}
 	return pm.secretInjector.GetSecretsForProcess(binaryName, cgroupID)
+}
+
+// GetTargetBinaries returns a list of all binary names configured for secret injection
+// This is used to configure kernel-side binary filtering
+func (pm *PolicyManager) GetTargetBinaries() []string {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	binaries := make([]string, 0)
+	seen := make(map[string]bool)
+
+	for _, binding := range pm.config.Secrets {
+		if binding.Selector.Binary != "" && !seen[binding.Selector.Binary] {
+			binaries = append(binaries, binding.Selector.Binary)
+			seen[binding.Selector.Binary] = true
+		}
+	}
+
+	return binaries
+}
+
+// IsKernelBinaryFilterEnabled returns whether kernel-side binary filtering is enabled
+func (pm *PolicyManager) IsKernelBinaryFilterEnabled() bool {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+	return pm.config.Policy.KernelBinaryFilter
 }
 
 func boolToUint8(b bool) uint8 {

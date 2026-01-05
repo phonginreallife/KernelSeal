@@ -39,6 +39,24 @@ struct {
     __type(value, __u8);
 } cgroup_filter_enabled SEC(".maps");
 
+// Target binary names to monitor (kernel-side filtering)
+// Key is the binary name (e.g., "cat", "psql", "node")
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 256);
+    __type(key, char[16]);   // binary name (comm)
+    __type(value, __u8);     // 1 = monitor this binary
+} target_binaries SEC(".maps");
+
+// Configuration: set to 1 to enable binary filtering
+// When enabled, only processes matching target_binaries will be monitored
+struct {
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(max_entries, 1);
+    __type(key, __u32);
+    __type(value, __u8);
+} binary_filter_enabled SEC(".maps");
+
 // Helper to check if we should monitor this cgroup
 static __always_inline int should_monitor_cgroup(__u64 cgid) {
     __u32 key = 0;
@@ -53,6 +71,21 @@ static __always_inline int should_monitor_cgroup(__u64 cgid) {
     return target && *target == 1;
 }
 
+// Helper to check if we should monitor this binary
+// Returns 1 if binary should be monitored, 0 otherwise
+static __always_inline int should_monitor_binary(const char *comm) {
+    __u32 key = 0;
+    __u8 *enabled = bpf_map_lookup_elem(&binary_filter_enabled, &key);
+    
+    // If filtering not enabled, monitor all binaries
+    if (!enabled || *enabled == 0)
+        return 1;
+    
+    // Check if this binary is in our target list
+    __u8 *target = bpf_map_lookup_elem(&target_binaries, (void *)comm);
+    return target && *target == 1;
+}
+
 // Tracepoint: sys_enter_execve - Called when execve() is invoked
 SEC("tracepoint/syscalls/sys_enter_execve")
 int handle_sys_enter_execve(struct trace_event_raw_sys_enter *ctx) {
@@ -60,13 +93,52 @@ int handle_sys_enter_execve(struct trace_event_raw_sys_enter *ctx) {
     __u32 pid = pid_tgid >> 32;
     __u32 tgid = pid_tgid & 0xFFFFFFFF;
     
-    
     // Get cgroup ID for container identification
     __u64 cgid = bpf_get_current_cgroup_id();
     
-    // DEBUG: Temporarily disable cgroup filtering to verify ring buffer works
-    // if (!should_monitor_cgroup(cgid))
-    //     return 0;
+    // Check cgroup filter first (if enabled)
+    if (!should_monitor_cgroup(cgid))
+        return 0;
+    
+    // Get the binary name from filename argument for filtering
+    // We need to extract the basename for comparison
+    const char *filename = (const char *)ctx->args[0];
+    char binary_name[16] = {};
+    
+    if (filename) {
+        // Read the full path
+        char full_path[256];
+        int ret = bpf_probe_read_user_str(full_path, sizeof(full_path), filename);
+        if (ret > 0) {
+            // Find the last '/' to get basename
+            int last_slash = -1;
+            #pragma unroll
+            for (int i = 0; i < 255 && i < ret; i++) {
+                if (full_path[i] == '/')
+                    last_slash = i;
+                if (full_path[i] == '\0')
+                    break;
+            }
+            
+            // Copy basename to binary_name
+            int start = last_slash + 1;
+            #pragma unroll
+            for (int i = 0; i < 15; i++) {
+                int idx = start + i;
+                if (idx < 256 && full_path[idx] != '\0') {
+                    binary_name[i] = full_path[idx];
+                } else {
+                    binary_name[i] = '\0';
+                    break;
+                }
+            }
+            binary_name[15] = '\0';
+        }
+    }
+    
+    // Check binary filter (if enabled) - filter in kernel space!
+    if (!should_monitor_binary(binary_name))
+        return 0;
     
     // Check for duplicate (same PID already being tracked)
     __u64 *existing = bpf_map_lookup_elem(&seen_pids, &pid);
@@ -109,8 +181,7 @@ int handle_sys_enter_execve(struct trace_event_raw_sys_enter *ctx) {
     // Get command name
     bpf_get_current_comm(&event->comm, sizeof(event->comm));
     
-    // Get filename from execve argument (first arg)
-    const char *filename = (const char *)ctx->args[0];
+    // Copy filename
     if (filename) {
         bpf_probe_read_user_str(event->filename, sizeof(event->filename), filename);
     } else {
