@@ -1,0 +1,85 @@
+# golangci-lint configuration for X00
+
+run:
+  timeout: 5m
+  go: '1.22'
+  tests: true
+  skip-dirs:
+    - vendor
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - unconvert
+    - bodyclose
+    - noctx
+    - gosec
+    - prealloc
+  disable:
+    - structcheck  # deprecated
+    - varcheck     # deprecated
+    - deadcode     # deprecated
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - io.Copy
+      - io.WriteString
+
+  govet:
+    check-shadowing: true
+    enable-all: true
+    disable:
+      - fieldalignment  # too strict for our use case
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: x00
+
+  misspell:
+    locale: US
+
+  gosec:
+    excludes:
+      - G104  # Audit errors not checked (we handle this intentionally in some places)
+      - G304  # File path provided as taint input (we validate paths)
+
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: false
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+        - noctx
+
+    # Exclude known issues in generated code
+    - path: ".*\\.gen\\.go"
+      linters:
+        - all
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
