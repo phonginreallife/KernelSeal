@@ -9,7 +9,6 @@ on:
 env:
   GO_VERSION: '1.22'
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   # Unit tests - runs on all PRs and pushes
@@ -156,6 +155,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set lowercase image name
+        run: echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Download BPF objects
         uses: actions/download-artifact@v4
