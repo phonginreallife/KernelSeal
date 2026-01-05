@@ -1,5 +1,6 @@
 # X00 Multi-stage Dockerfile
 # Builds both the BPF programs and Go binary
+# hadolint global ignore=DL3008
 
 # Stage 1: Build BPF programs using Cilium's eBPF builder
 FROM docker.io/cilium/ebpf-builder:1698931239 AS bpf-builder
@@ -15,6 +16,7 @@ FROM golang:1.22-alpine AS go-builder
 WORKDIR /app
 
 # Install build dependencies
+# hadolint ignore=DL3018
 RUN apk add --no-cache git
 
 # Copy go mod files first for caching
@@ -30,19 +32,15 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o x00 ./cmd/main.go
 
 # Stage 3: Final runtime image
-# Using distroless for minimal attack surface
-FROM gcr.io/distroless/base-debian12:nonroot AS runtime-base
-
-# Alternative: If distroless doesn't work, use slim debian
-FROM debian:bookworm-slim AS runtime
+FROM debian:bookworm-slim
 
 # Security: Run apt with minimal privileges and clean up
+# hadolint ignore=DL3009
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    ca-certificates=20230311 \
+    ca-certificates \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-    && rm -rf /var/cache/apt/archives/*
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Security: Create non-root user (X00 needs root for BPF, but prepare for future)
 RUN groupadd -r x00 && useradd -r -g x00 -s /sbin/nologin x00
@@ -76,9 +74,9 @@ LABEL org.opencontainers.image.title="X00 Security Sidecar" \
 # Set working directory
 WORKDIR /
 
-# Health check
+# Health check - use shell form for proper exit handling
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD ["/usr/local/bin/x00", "-version"] || exit 1
+    CMD /usr/local/bin/x00 -version || exit 1
 
 # Note: X00 requires root for BPF operations
 # USER x00  # Uncomment when running non-BPF components

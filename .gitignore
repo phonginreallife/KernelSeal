@@ -47,8 +47,8 @@ id_ed25519*
 id_dsa*
 id_ecdsa*
 *.secret
-secrets/
-!secrets/.gitkeep
+/secrets/
+!/secrets/.gitkeep
 
 # Kubernetes secrets and sensitive configs
 kubeconfig
