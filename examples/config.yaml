@@ -1,0 +1,89 @@
+# X00 Example Configuration
+# Copy this file to /etc/x00/config.yaml and customize
+
+version: v1
+
+policy:
+  # Enforcement mode:
+  # - disabled: X00 does nothing
+  # - audit: Log accesses but don't block
+  # - enforce: Log and block unauthorized access
+  mode: enforce
+  
+  # Protect environment variables from being read via /proc/<pid>/environ
+  blockEnviron: true
+  
+  # Protect process memory from being read via /proc/<pid>/mem
+  blockMem: true
+  
+  # Protect memory maps from being read via /proc/<pid>/maps
+  # Note: Some debugging tools need this, set to false if needed
+  blockMaps: false
+  
+  # Prevent ptrace from attaching to protected processes
+  blockPtrace: true
+  
+  # Allow a process to read its own /proc files
+  # This is usually safe and needed for self-inspection
+  allowSelfRead: true
+  
+  # Log all accesses (even allowed ones) for audit purposes
+  auditAll: false
+
+secrets:
+  # Example: Inject database credentials into PostgreSQL client
+  - name: postgres-secrets
+    selector:
+      binary: "psql"
+    secretRefs:
+      - name: PGPASSWORD
+        source:
+          # Read from Kubernetes secret mount
+          secretKeyRef:
+            name: postgres-credentials
+            key: password
+      - name: PGUSER
+        source:
+          secretKeyRef:
+            name: postgres-credentials
+            key: username
+
+  # Example: Inject API keys into a web application
+  - name: webapp-secrets
+    selector:
+      binary: "node"
+      # Or match by container name:
+      # container: "webapp"
+    secretRefs:
+      - name: API_SECRET_KEY
+        source:
+          secretKeyRef:
+            name: webapp-api-keys
+            key: secret-key
+      - name: STRIPE_API_KEY
+        source:
+          secretKeyRef:
+            name: stripe-credentials
+            key: api-key
+      - name: JWT_SECRET
+        source:
+          # Read from a file (e.g., for Vault agent sidecar integration)
+          fileRef: "/vault/secrets/jwt-secret"
+
+  # Example: Inject AWS credentials
+  - name: aws-secrets
+    selector:
+      binary: "aws"
+    secretRefs:
+      - name: AWS_ACCESS_KEY_ID
+        source:
+          envRef: "X00_AWS_ACCESS_KEY_ID"
+      - name: AWS_SECRET_ACCESS_KEY
+        source:
+          envRef: "X00_AWS_SECRET_ACCESS_KEY"
+
+monitoring:
+  enabled: true
+  metricsPort: 9090
+  logLevel: info  # debug, info, warn, error
+  auditLog: /var/log/x00/audit.log
