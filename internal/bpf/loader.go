@@ -36,15 +36,15 @@ type Manager struct {
 
 // execObjects holds the exec monitor BPF objects
 type execObjects struct {
-	HandleSysEnterExecve  *ebpf.Program `ebpf:"handle_sys_enter_execve"`
-	HandleSchedProcExec   *ebpf.Program `ebpf:"handle_sched_process_exec"`
-	HandleSchedProcExit   *ebpf.Program `ebpf:"handle_sched_process_exit"`
-	ExecEvents            *ebpf.Map     `ebpf:"exec_events"`
-	SeenPids              *ebpf.Map     `ebpf:"seen_pids"`
-	TargetCgroups         *ebpf.Map     `ebpf:"target_cgroups"`
-	CgroupFilterEnabled   *ebpf.Map     `ebpf:"cgroup_filter_enabled"`
-	TargetBinaries        *ebpf.Map     `ebpf:"target_binaries"`
-	BinaryFilterEnabled   *ebpf.Map     `ebpf:"binary_filter_enabled"`
+	HandleSysEnterExecve *ebpf.Program `ebpf:"handle_sys_enter_execve"`
+	HandleSchedProcExec  *ebpf.Program `ebpf:"handle_sched_process_exec"`
+	HandleSchedProcExit  *ebpf.Program `ebpf:"handle_sched_process_exit"`
+	ExecEvents           *ebpf.Map     `ebpf:"exec_events"`
+	SeenPids             *ebpf.Map     `ebpf:"seen_pids"`
+	TargetCgroups        *ebpf.Map     `ebpf:"target_cgroups"`
+	CgroupFilterEnabled  *ebpf.Map     `ebpf:"cgroup_filter_enabled"`
+	TargetBinaries       *ebpf.Map     `ebpf:"target_binaries"`
+	BinaryFilterEnabled  *ebpf.Map     `ebpf:"binary_filter_enabled"`
 }
 
 // lsmObjects holds the LSM BPF objects
