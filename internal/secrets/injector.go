@@ -112,7 +112,7 @@ func (i *Injector) InjectSecrets(pid uint32, secrets []Secret) InjectionResult {
 	}
 
 	if err != nil {
-		result.Error = err //nolint:govet // Error field is used by callers
+		result.Error = err
 		return result
 	}
 

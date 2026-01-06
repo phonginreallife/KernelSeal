@@ -35,6 +35,7 @@ linters-settings:
     disable:
       - fieldalignment # too strict for our use case
       - shadow # handled separately
+      - unusedwrite # false positive on struct fields used by callers
 
   gofmt:
     simplify: true
