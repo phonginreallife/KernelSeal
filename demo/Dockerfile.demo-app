@@ -1,7 +1,7 @@
 # Demo Application Container
 # A simple app that KernelSeal will monitor and inject secrets into
 
-FROM alpine:3.19
+FROM alpine:3.23
 
 RUN apk add --no-cache \
     bash \
