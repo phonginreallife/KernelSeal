@@ -1,11 +1,11 @@
-# X00 Example Configuration
-# Copy this file to /etc/x00/config.yaml and customize
+# KernelSeal Example Configuration
+# Copy this file to /etc/kernelseal/config.yaml and customize
 
 version: v1
 
 policy:
   # Enforcement mode:
-  # - disabled: X00 does nothing
+  # - disabled: KernelSeal does nothing
   # - audit: Log accesses but don't block
   # - enforce: Log and block unauthorized access
   mode: enforce
@@ -31,9 +31,9 @@ policy:
   auditAll: false
   
   # Kernel-side binary filtering (RECOMMENDED for production)
-  # When enabled, X00 only monitors processes matching configured binaries
+  # When enabled, KernelSeal only monitors processes matching configured binaries
   # This significantly reduces CPU overhead on busy systems
-  # When disabled, X00 monitors ALL process executions (higher overhead)
+  # When disabled, KernelSeal monitors ALL process executions (higher overhead)
   kernelBinaryFilter: true
 
 secrets:
@@ -83,13 +83,13 @@ secrets:
     secretRefs:
       - name: AWS_ACCESS_KEY_ID
         source:
-          envRef: "X00_AWS_ACCESS_KEY_ID"
+          envRef: "KernelSeal_AWS_ACCESS_KEY_ID"
       - name: AWS_SECRET_ACCESS_KEY
         source:
-          envRef: "X00_AWS_SECRET_ACCESS_KEY"
+          envRef: "KernelSeal_AWS_SECRET_ACCESS_KEY"
 
 monitoring:
   enabled: true
   metricsPort: 9090
   logLevel: info  # debug, info, warn, error
-  auditLog: /var/log/x00/audit.log
+  auditLog: /var/log/kernelseal/audit.log

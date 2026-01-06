@@ -1,44 +1,44 @@
-# X00 Demo with Docker
-# This demonstrates X00 monitoring a container and injecting secrets
+# KernelSeal Demo with Docker
+# This demonstrates KernelSeal monitoring a container and injecting secrets
 
 version: '3.8'
 
 services:
-  # X00 Sidecar - runs privileged to load BPF programs
-  x00:
+  # KernelSeal Sidecar - runs privileged to load BPF programs
+  kernelseal:
     build:
       context: ..
-      dockerfile: demo/Dockerfile.x00
+      dockerfile: demo/Dockerfile.kernelseal
     privileged: true
     pid: "host"  # Share PID namespace to monitor other containers
     volumes:
       - /sys/kernel/debug:/sys/kernel/debug:ro
       - /sys/fs/bpf:/sys/fs/bpf
-      - ../examples/demo-config.yaml:/etc/x00/config.yaml:ro
+      - ../examples/demo-config.yaml:/etc/kernelseal/config.yaml:ro
     environment:
-      - X00_DEMO_API_KEY=docker-demo-api-key-12345
-      - X00_DEMO_DB_PASSWORD=docker-demo-password
-      - X00_DEMO_SECRET=docker-demo-secret
+      - KernelSeal_DEMO_API_KEY=docker-demo-api-key-12345
+      - KernelSeal_DEMO_DB_PASSWORD=docker-demo-password
+      - KernelSeal_DEMO_SECRET=docker-demo-secret
     cap_add:
       - SYS_ADMIN
       - BPF
       - SYS_PTRACE
       - NET_ADMIN
     networks:
-      - x00-demo
+      - kernelseal-demo
 
-  # Demo application that X00 will monitor
+  # Demo application that KernelSeal will monitor
   demo-app:
     build:
       context: ..
       dockerfile: demo/Dockerfile.demo-app
     depends_on:
-      - x00
+      - kernelseal
     networks:
-      - x00-demo
-    # This container will have secrets injected by X00
+      - kernelseal-demo
+    # This container will have secrets injected by KernelSeal
     command: ["sh", "-c", "echo 'Demo app running...'; while true; do echo 'Tick'; sleep 5; done"]
 
 networks:
-  x00-demo:
+  kernelseal-demo:
     driver: bridge

@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"x00/internal/types"
+	"kernelseal/internal/types"
 )
 
 func TestNewManager(t *testing.T) {

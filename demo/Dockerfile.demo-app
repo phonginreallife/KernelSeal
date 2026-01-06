@@ -1,5 +1,5 @@
 # Demo Application Container
-# A simple app that X00 will monitor and inject secrets into
+# A simple app that KernelSeal will monitor and inject secrets into
 
 FROM alpine:3.19
 

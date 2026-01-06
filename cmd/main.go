@@ -1,4 +1,4 @@
-// X00 - Kubernetes Sidecar for Secret Protection using eBPF and BPF-LSM
+// KernelSeal - Kubernetes Sidecar for Secret Protection using eBPF and BPF-LSM
 package main
 
 import (
@@ -9,26 +9,26 @@ import (
 	"strings"
 	"syscall"
 
-	"x00/internal"
-	"x00/internal/bpf"
-	"x00/internal/secrets"
-	"x00/internal/types"
+	"kernelseal/internal"
+	"kernelseal/internal/bpf"
+	"kernelseal/internal/secrets"
+	"kernelseal/internal/types"
 )
 
 const (
 	defaultExecMonitorPath = "bpf/exec_monitor.bpf.o"
 	defaultLSMPath         = "bpf/lsm_file_protect.bpf.o"
-	defaultConfigPath      = "/etc/x00/config.yaml"
+	defaultConfigPath      = "/etc/kernelseal/config.yaml"
 )
 
 func main() {
 	// Parse command line flags
-	configPath := flag.String("config", defaultConfigPath, "Path to X00 configuration file")
+	configPath := flag.String("config", defaultConfigPath, "Path to KernelSeal configuration file")
 	execMonitorPath := flag.String("exec-monitor", defaultExecMonitorPath, "Path to exec monitor BPF object")
 	lsmPath := flag.String("lsm", defaultLSMPath, "Path to LSM BPF object")
 	flag.Parse()
 
-	log.Println("[START] Starting X00 Sidecar - Secret Protection System")
+	log.Println("[START] Starting KernelSeal Sidecar - Secret Protection System")
 	log.Printf("   Version: 0.1.0")
 	log.Printf("   Config: %s", *configPath)
 
@@ -117,7 +117,7 @@ func main() {
 	// Start processing events
 	bpfManager.Start()
 
-	log.Println("[OK] X00 Sidecar running - monitoring for process execution")
+	log.Println("[OK] KernelSeal Sidecar running - monitoring for process execution")
 	log.Println("   Press Ctrl+C to stop")
 
 	// Wait for shutdown signal
@@ -125,9 +125,9 @@ func main() {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	<-sigs
 
-	log.Println("[STOP] Shutting down X00...")
+	log.Println("[STOP] Shutting down KernelSeal...")
 	bpfManager.Stop()
-	log.Println("[DONE] X00 stopped")
+	log.Println("[DONE] KernelSeal stopped")
 }
 
 // handleExecEvent processes exec events from BPF

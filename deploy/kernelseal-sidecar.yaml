@@ -1,10 +1,10 @@
-# X00 Sidecar Deployment Template
-# This shows how to deploy X00 as a sidecar alongside your application
+# KernelSeal Sidecar Deployment Template
+# This shows how to deploy KernelSeal as a sidecar alongside your application
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: x00-config
+  name: kernelseal-config
   namespace: default
 data:
   config.yaml: |
@@ -38,17 +38,17 @@ data:
       enabled: true
       metricsPort: 9090
       logLevel: info
-      auditLog: /var/log/x00/audit.log
+      auditLog: /var/log/kernelseal/audit.log
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: x00-demo
+  name: kernelseal-demo
   labels:
-    app: x00-demo
-    x00.io/protected: "true"
+    app: kernelseal-demo
+    kernelseal.io/protected: "true"
 spec:
-  shareProcessNamespace: true  # Required for X00 to access app processes
+  shareProcessNamespace: true  # Required for KernelSeal to access app processes
   
   containers:
   # Your application container
@@ -62,17 +62,17 @@ spec:
       limits:
         memory: "128Mi"
         cpu: "200m"
-    # No secrets mounted here - X00 injects them at runtime
+    # No secrets mounted here - KernelSeal injects them at runtime
     volumeMounts:
-    - name: x00-secrets-runtime
-      mountPath: /run/x00/secrets
+    - name: kernelseal-secrets-runtime
+      mountPath: /run/kernelseal/secrets
       readOnly: true
 
-  # X00 sidecar container
-  - name: x00
-    image: your-registry/x00:latest
+  # KernelSeal sidecar container
+  - name: kernelseal
+    image: your-registry/kernelseal:latest
     args:
-      - "-config=/etc/x00/config.yaml"
+      - "-config=/etc/kernelseal/config.yaml"
     securityContext:
       privileged: true
       capabilities:
@@ -89,13 +89,13 @@ spec:
         memory: "256Mi"
         cpu: "500m"
     volumeMounts:
-    - name: x00-config
-      mountPath: /etc/x00
+    - name: kernelseal-config
+      mountPath: /etc/kernelseal
       readOnly: true
-    - name: x00-secrets-runtime
-      mountPath: /run/x00/secrets
-    - name: x00-secrets-source
-      mountPath: /var/run/secrets/x00
+    - name: kernelseal-secrets-runtime
+      mountPath: /run/kernelseal/secrets
+    - name: kernelseal-secrets-source
+      mountPath: /var/run/secrets/kernelseal
       readOnly: true
     - name: sys-kernel-debug
       mountPath: /sys/kernel/debug
@@ -107,14 +107,14 @@ spec:
       mountPath: /sys/fs/bpf
 
   volumes:
-  - name: x00-config
+  - name: kernelseal-config
     configMap:
-      name: x00-config
-  - name: x00-secrets-runtime
+      name: kernelseal-config
+  - name: kernelseal-secrets-runtime
     emptyDir:
       medium: Memory
       sizeLimit: 10Mi
-  - name: x00-secrets-source
+  - name: kernelseal-secrets-source
     projected:
       sources:
       - secret:

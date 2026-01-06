@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-We take security seriously. If you discover a security vulnerability in X00, please report it responsibly.
+We take security seriously. If you discover a security vulnerability in KernelSeal, please report it responsibly.
 
 ### How to Report
 
@@ -34,11 +34,11 @@ We take security seriously. If you discover a security vulnerability in X00, ple
 
 The following are in scope for security reports:
 
-- X00 sidecar binary and its dependencies
+- KernelSeal sidecar binary and its dependencies
 - BPF programs (exec_monitor, lsm_file_protect)
 - Secret injection mechanisms
 - Policy enforcement bypass
-- Container escape via X00
+- Container escape via KernelSeal
 - Privilege escalation
 
 ### Out of Scope
@@ -53,7 +53,7 @@ The following are in scope for security reports:
 
 ### BPF Program Security
 
-X00's BPF programs run in kernel space. Security measures include:
+KernelSeal's BPF programs run in kernel space. Security measures include:
 
 1. **Verifier Protection**: All BPF programs pass the kernel verifier
 2. **Bounded Loops**: All loops are bounded to prevent infinite execution
@@ -69,7 +69,7 @@ X00's BPF programs run in kernel space. Security measures include:
 
 ### Container Security
 
-1. **Privileged Mode**: X00 requires privileged mode for BPF operations
+1. **Privileged Mode**: KernelSeal requires privileged mode for BPF operations
 2. **Capability Restrictions**: Only necessary capabilities should be granted:
    - `CAP_BPF` - Load BPF programs
    - `CAP_SYS_ADMIN` - Access cgroups and system resources
@@ -78,7 +78,7 @@ X00's BPF programs run in kernel space. Security measures include:
 
 ### Network Security
 
-1. **No Network Listeners**: X00 does not open any network ports by default
+1. **No Network Listeners**: KernelSeal does not open any network ports by default
 2. **Vault Integration**: Use TLS for Vault communication
 3. **mTLS**: Recommended for any external secret sources
 
@@ -122,17 +122,17 @@ This repository includes automated security scanning:
 
 ## Hardening Checklist
 
-- [ ] Run X00 with minimal required capabilities
+- [ ] Run KernelSeal with minimal required capabilities
 - [ ] Use read-only root filesystem
 - [ ] Enable enforce mode (not audit)
 - [ ] Configure proper RBAC in Kubernetes
-- [ ] Use network policies to restrict X00's network access
+- [ ] Use network policies to restrict KernelSeal's network access
 - [ ] Regularly update to latest version
-- [ ] Monitor X00 audit logs
-- [ ] Use separate service account for X00
+- [ ] Monitor KernelSeal audit logs
+- [ ] Use separate service account for KernelSeal
 - [ ] Rotate secrets regularly
 - [ ] Enable seccomp profiles where possible
 
 ## License
 
-X00 BPF programs are dual-licensed under GPL-2.0 OR BSD-3-Clause as required for BPF programs. The userspace components are licensed under Apache-2.0.
+KernelSeal BPF programs are dual-licensed under GPL-2.0 OR BSD-3-Clause as required for BPF programs. The userspace components are licensed under Apache-2.0.
