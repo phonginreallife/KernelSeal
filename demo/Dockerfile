@@ -1,7 +1,7 @@
 # KernelSeal All-in-One Demo Image
 # Uses pre-built BPF objects from host
 
-FROM golang:1.22-bookworm AS builder
+FROM golang:1.25-bookworm AS builder
 
 # Install minimal BPF dependencies for compilation
 RUN apt-get update && apt-get install -y \
