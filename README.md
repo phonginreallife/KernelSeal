@@ -4,7 +4,7 @@
 
 X00 is a security sidecar that protects application secrets at the kernel level. Unlike traditional secret management that mounts secrets into container filesystems, X00 injects secrets directly into process memory at runtime and uses BPF-LSM to prevent unauthorized access—even from root users inside the container.
 
-## 🎯 Key Features
+## Key Features
 
 - **Zero-Mount Secrets**: Secrets are never mounted into the container filesystem
 - **Runtime Injection**: Secrets are injected on-demand when target processes start
@@ -12,8 +12,9 @@ X00 is a security sidecar that protects application secrets at the kernel level.
 - **Ptrace Prevention**: Blocks debuggers from attaching to protected processes
 - **Container-Aware**: Integrates with Kubernetes namespaces and cgroups
 - **No Code Changes**: Applications read secrets from environment variables as usual
+- **Kernel-Side Filtering**: Optional binary filtering in kernel space reduces CPU overhead
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -45,21 +46,22 @@ X00 is a security sidecar that protects application secrets at the kernel level.
 │  │                        Linux Kernel                            │ │
 │  │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐ │ │
 │  │  │ exec_monitor.bpf │  │ lsm_file_protect │  │  Ring Buffer │ │ │
-│  │  │ • Tracepoint:    │  │ • LSM: file_open │  │  • Events    │ │ │
-│  │  │   sys_enter_     │  │ • LSM: ptrace_   │  │    to user   │ │ │
-│  │  │   execve         │  │   access_check   │  │    space     │ │ │
+│  │  │ • sys_enter_     │  │ • LSM: file_open │  │  • Events    │ │ │
+│  │  │   execve         │  │ • LSM: ptrace_   │  │    to user   │ │ │
+│  │  │ • sched_process_ │  │   access_check   │  │    space     │ │ │
+│  │  │   exec (filter)  │  │                  │  │              │ │ │
 │  │  └──────────────────┘  └──────────────────┘  └──────────────┘ │ │
 │  └────────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-## 🔒 How It Works
+## How It Works
 
 ### 1. Process Detection
-When a new process starts in the container, the eBPF tracepoint attached to `sys_enter_execve` captures the event and sends it to user space via ring buffer.
+When a new process starts, the eBPF tracepoint attached to `sys_enter_execve` (or `sched_process_exec` when kernel filtering is enabled) captures the event and sends it to user space via ring buffer.
 
 ### 2. Secret Injection
-X00 checks if the process matches any configured secret bindings. If so, it injects the secrets into the process memory, making them available as environment variables.
+X00 checks if the process matches any configured secret bindings (by binary name). If so, it injects the secrets into the process, making them available via file-based secret delivery.
 
 ### 3. Kernel Protection
 BPF-LSM hooks prevent any process (including root) from:
@@ -73,9 +75,9 @@ X00 supports three enforcement modes:
 - **Audit**: Log access attempts but don't block
 - **Enforce**: Block and log unauthorized access
 
-## 📋 Requirements
+## Requirements
 
-- **Kernel**: Linux ≥ 5.7 with BPF-LSM enabled
+- **Kernel**: Linux >= 5.7 with BPF-LSM enabled
 - **Kernel Config**:
   ```
   CONFIG_BPF=y
@@ -83,6 +85,7 @@ X00 supports three enforcement modes:
   CONFIG_BPF_LSM=y
   CONFIG_DEBUG_INFO_BTF=y
   ```
+- **Boot Parameters**: `lsm=lockdown,capability,yama,bpf` (ensure `bpf` is in the list)
 - **Kubernetes**: 1.20+ (tested on 1.28)
 - **Container Runtime**: containerd, CRI-O
 
@@ -97,23 +100,66 @@ cat /sys/kernel/security/lsm
 ls /sys/kernel/btf/vmlinux
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
-### 1. Build X00
+### Option 1: Run with Docker (for testing)
+
+```bash
+# Pull the image
+docker pull ghcr.io/phonginreallife/x00:latest
+
+# Create a config file
+cat > /tmp/x00-config.yaml << 'EOF'
+version: v1
+policy:
+  mode: enforce
+  blockEnviron: true
+  blockMem: true
+  blockPtrace: true
+  allowSelfRead: true
+  kernelBinaryFilter: false
+
+secrets:
+  - name: test-secrets
+    selector:
+      binary: "sleep"
+    secretRefs:
+      - name: MY_SECRET
+        source:
+          envRef: "X00_MY_SECRET"
+EOF
+
+# Run X00
+docker run -d --name x00 \
+  --privileged \
+  --pid=host \
+  -v /sys/kernel/security:/sys/kernel/security:ro \
+  -v /tmp/x00-config.yaml:/etc/x00/config.yaml:ro \
+  -e X00_MY_SECRET="secret-value-here" \
+  ghcr.io/phonginreallife/x00:latest
+
+# View logs
+docker logs -f x00
+```
+
+### Option 2: Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourorg/x00.git
+git clone https://github.com/phonginreallife/x00.git
 cd x00
 
 # Build using Docker (recommended)
-make docker-dev
+make docker-build
 
 # Or build locally (requires clang, llvm, bpftool)
 make all
+
+# Run locally (requires root)
+sudo ./build/x00 -config examples/config.yaml
 ```
 
-### 2. Deploy to Kubernetes
+### Option 3: Deploy to Kubernetes
 
 ```bash
 # Create namespace and RBAC
@@ -126,7 +172,7 @@ kubectl apply -f deploy/manifests/configmap.yaml
 kubectl apply -f deploy/manifests/daemonset.yaml
 ```
 
-### 3. Deploy Your Application with X00 Sidecar
+### Deploy Your Application with X00 Sidecar
 
 ```yaml
 apiVersion: v1
@@ -140,7 +186,7 @@ spec:
     image: myapp:latest
     # No secret mounts needed!
   - name: x00
-    image: your-registry/x00:latest
+    image: ghcr.io/phonginreallife/x00:latest
     securityContext:
       privileged: true
       capabilities:
@@ -148,9 +194,19 @@ spec:
     volumeMounts:
     - name: x00-config
       mountPath: /etc/x00
+    - name: kernel-security
+      mountPath: /sys/kernel/security
+      readOnly: true
+  volumes:
+  - name: x00-config
+    configMap:
+      name: x00-config
+  - name: kernel-security
+    hostPath:
+      path: /sys/kernel/security
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 X00 is configured via YAML file (`/etc/x00/config.yaml`):
 
@@ -158,16 +214,19 @@ X00 is configured via YAML file (`/etc/x00/config.yaml`):
 version: v1
 
 policy:
-  mode: enforce          # disabled, audit, enforce
-  blockEnviron: true     # Block /proc/*/environ
-  blockMem: true         # Block /proc/*/mem
-  blockPtrace: true      # Block ptrace
-  allowSelfRead: true    # Allow process to read own /proc
+  mode: enforce              # disabled, audit, enforce
+  blockEnviron: true         # Block /proc/*/environ
+  blockMem: true             # Block /proc/*/mem
+  blockMaps: false           # Block /proc/*/maps
+  blockPtrace: true          # Block ptrace
+  allowSelfRead: true        # Allow process to read own /proc
+  auditAll: false            # Log all accesses (even allowed)
+  kernelBinaryFilter: true   # Enable kernel-side binary filtering
 
 secrets:
   - name: database-creds
     selector:
-      binary: "postgres"   # Match by binary name
+      binary: "postgres"     # Match by binary name
     secretRefs:
       - name: PGPASSWORD
         source:
@@ -181,13 +240,22 @@ monitoring:
   logLevel: info
 ```
 
+### Kernel-Side Binary Filtering
+
+When `kernelBinaryFilter: true`, X00 only processes exec events for binaries listed in your `secrets` configuration. This significantly reduces CPU overhead on busy systems.
+
+| Setting | Behavior | Use Case |
+|---------|----------|----------|
+| `false` | Monitor ALL processes | Development, debugging |
+| `true` | Monitor only configured binaries | Production (recommended) |
+
 ### Secret Sources
 
 X00 supports multiple secret sources:
 
 ```yaml
 secretRefs:
-  # From Kubernetes Secret
+  # From Kubernetes Secret (mounted as file)
   - name: DB_PASSWORD
     source:
       secretKeyRef:
@@ -199,13 +267,46 @@ secretRefs:
     source:
       fileRef: "/vault/secrets/api-key"
   
-  # From environment variable
+  # From environment variable (X00's own environment)
   - name: TOKEN
     source:
       envRef: "SOURCE_TOKEN"
 ```
 
-## 🔍 Observability
+## Observability
+
+### Logs
+
+```bash
+# View X00 logs
+kubectl logs -n x00-system -l app.kubernetes.io/name=x00 -f
+
+# Or with Docker
+docker logs -f x00
+```
+
+Example output:
+```
+[START] Starting X00 Sidecar - Secret Protection System
+   Version: 0.1.0
+   Config: /etc/x00/config.yaml
+[CONFIG] Loaded X00 configuration from /etc/x00/config.yaml
+[CONFIG] Policy applied: mode=enforce
+[REGISTER] Registered 2 secrets for binary: sleep
+[OK] Exec monitor BPF programs loaded and attached
+[FILTER] Kernel-side binary filtering DISABLED by config - monitoring all processes
+[OK] LSM BPF programs loaded and attached
+[ALLOW] PID 1234 added to allowed list
+[CONFIG] Policy configured: mode=enforce, environ=true, mem=true, ptrace=true
+[OK] X00 Sidecar running - monitoring for process execution
+
+[EXEC] PID=5678 PPID=1234 Comm=sleep File=/usr/bin/sleep Binary=sleep CgroupID=7194
+[FILE] Secrets written to /run/x00/secrets/5678 for PID 5678
+[PROTECT] PID 5678 marked as protected
+[INJECT] Secrets injected into PID 5678: [MY_SECRET]
+
+[LSM BLOCKED] PID=9999 attempted environ access to PID=5678 (cat)
+```
 
 ### Metrics (Prometheus)
 
@@ -216,33 +317,22 @@ X00 exposes metrics on `:9090/metrics`:
 - `x00_access_blocked_total` - Total blocked access attempts
 - `x00_access_audit_total` - Total audited access attempts
 
-### Logs
+## Testing
+
+### Verify Protection Works
 
 ```bash
-# View X00 logs
-kubectl logs -n x00-system -l app.kubernetes.io/name=x00 -f
+# Start a protected process
+sleep 300 &
+SLEEP_PID=$!
+echo "Sleep PID: $SLEEP_PID"
 
-# Example output:
-# 🚀 Starting X00 Sidecar - Secret Protection System
-# ✅ Exec monitor BPF programs loaded and attached
-# ✅ LSM BPF programs loaded and attached
-# 📍 EXEC: PID=1234 Comm=postgres File=/usr/bin/postgres
-# 💉 Secrets injected into PID 1234: [PGPASSWORD]
-# 🛡️ LSM BLOCKED: PID=5678 attempted environ access to PID=1234 (cat)
-```
+# Wait for injection
+sleep 3
 
-## 🧪 Testing
-
-### Verify Protection
-
-```bash
-# Deploy a test pod with X00
-kubectl apply -f deploy/x00-sidecar.yaml
-
-# Try to read environ from another process (should be blocked)
-kubectl exec -it x00-demo -c myapp -- sh
-$ cat /proc/1/environ
-cat: /proc/1/environ: Operation not permitted
+# Try to read environ (should be BLOCKED)
+cat /proc/$SLEEP_PID/environ
+# Expected: cat: /proc/XXXX/environ: Operation not permitted
 ```
 
 ### Run Unit Tests
@@ -251,12 +341,17 @@ cat: /proc/1/environ: Operation not permitted
 make test
 ```
 
-## 🔧 Development
+## Development
 
 ### Project Structure
 
 ```
 x00/
+├── .github/                # CI/CD workflows
+│   ├── workflows/
+│   │   ├── ci.yaml         # Build and test
+│   │   └── release.yaml    # Docker image publishing
+│   └── dependabot.yml      # Dependency updates
 ├── bpf/                    # eBPF programs
 │   ├── exec_monitor.bpf.c  # Process execution monitor
 │   ├── lsm_file_protect.bpf.c  # LSM hooks for file protection
@@ -266,13 +361,24 @@ x00/
 │   └── main.go             # Entry point
 ├── internal/
 │   ├── bpf/                # BPF loader and management
+│   │   └── loader.go
 │   ├── secrets/            # Secret injection
+│   │   └── injector.go
 │   ├── types/              # Shared Go types
+│   │   └── events.go
 │   └── policy.go           # Policy management
 ├── deploy/                 # Kubernetes manifests
+│   ├── manifests/
+│   └── x00-sidecar.yaml
+├── demo/                   # Demo scripts
 ├── examples/               # Example configurations
-├── Dockerfile
-├── Makefile
+│   └── config.yaml
+├── scripts/                # Build and utility scripts
+├── test/                   # Integration tests
+│   └── integration/
+├── Dockerfile              # Multi-stage Docker build
+├── Makefile                # Build automation
+├── SECURITY.md             # Security policy
 └── README.md
 ```
 
@@ -295,22 +401,51 @@ make build
 sudo ./build/x00 -config examples/config.yaml
 ```
 
-## ⚠️ Security Considerations
+### Building Docker Image
+
+```bash
+# Build image
+make docker-build
+
+# Tag and push (CI does this automatically on release)
+docker tag x00:latest ghcr.io/yourorg/x00:v1.0.0
+docker push ghcr.io/yourorg/x00:v1.0.0
+```
+
+## Security Considerations
 
 1. **Privileged Container**: X00 requires privileged access to load BPF programs
 2. **Shared Process Namespace**: Pods must set `shareProcessNamespace: true`
 3. **Kernel Requirements**: BPF-LSM must be enabled in the kernel
 4. **Trust Model**: X00 sidecar is trusted; ensure image integrity
+5. **Secret Storage**: X00 reads secrets from its own environment or mounted files; protect these sources
 
-## 📜 License
+### Security Scanning
+
+The CI pipeline includes:
+- **gosec**: Go security linting
+- **govulncheck**: Go vulnerability scanning
+- **Trivy**: Container image scanning
+- **Hadolint**: Dockerfile linting
+- **Gitleaks**: Secret detection in code
+
+## CI/CD
+
+Releases are automated via GitHub Actions:
+
+1. Push a tag: `git tag v1.0.0 && git push origin v1.0.0`
+2. CI builds and pushes Docker image to `ghcr.io/phonginreallife/x00:v1.0.0`
+3. Image is also tagged as `latest`
+
+## License
 
 Apache License 2.0
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Please read CONTRIBUTING.md for guidelines.
 
-## 📚 References
+## References
 
 - [BPF LSM Documentation](https://docs.kernel.org/bpf/prog_lsm.html)
 - [Cilium eBPF Library](https://github.com/cilium/ebpf)
