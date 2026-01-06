@@ -357,16 +357,21 @@ func (m *Manager) Start() {
 
 // Stop stops all BPF event processing and cleans up
 func (m *Manager) Stop() {
+	// Signal goroutines to stop
 	close(m.stopCh)
-	m.wg.Wait()
 
-	// Close readers
+	// Close readers FIRST to unblock Read() calls
+	// This is critical - Read() is blocking, so we must close readers
+	// before waiting for goroutines to finish
 	if m.execReader != nil {
 		m.execReader.Close()
 	}
 	if m.lsmReader != nil {
 		m.lsmReader.Close()
 	}
+
+	// Now wait for goroutines to finish (they will exit on ErrClosed)
+	m.wg.Wait()
 
 	// Close links
 	for _, l := range m.execLinks {
@@ -376,7 +381,7 @@ func (m *Manager) Stop() {
 		l.Close()
 	}
 
-	log.Println("[STOP] BPF manager stopped")
+	log.Println("[DONE] BPF manager stopped")
 }
 
 func (m *Manager) processExecEvents() {
