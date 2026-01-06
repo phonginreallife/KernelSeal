@@ -109,7 +109,7 @@ jobs:
         run: make bpf
 
       - name: Upload BPF objects
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bpf-objects
           path: bpf/*.bpf.o
@@ -137,7 +137,7 @@ jobs:
             -o kernelseal ./cmd/main.go
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: kernelseal-binary
           path: kernelseal
