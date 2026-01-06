@@ -8,7 +8,6 @@ on:
 
 env:
   GO_VERSION: '1.22'
-  REGISTRY: ghcr.io
 
 jobs:
   # Unit tests - runs on all PRs and pushes
@@ -144,20 +143,15 @@ jobs:
           path: x00
           retention-days: 7
 
-  # Build and push Docker image
+  # Build Docker image (validation only - no push)
+  # Actual releases are handled by release.yaml on version tags
   docker:
-    name: Build Docker Image
+    name: Build Docker Image (Validate)
     runs-on: ubuntu-latest
     needs: [build, build-bpf]
-    permissions:
-      contents: read
-      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set lowercase image name
-        run: echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Download BPF objects
         uses: actions/download-artifact@v4
@@ -168,32 +162,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-        if: github.event_name != 'pull_request'
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix=
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-
-      - name: Build and push Docker image
+      - name: Build Docker image (no push)
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: false
+          tags: x00:ci-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
