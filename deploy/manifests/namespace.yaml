@@ -1,0 +1,58 @@
+# X00 Namespace and core resources
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: x00-system
+  labels:
+    app.kubernetes.io/name: x00
+    app.kubernetes.io/component: security
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: x00-controller
+  namespace: x00-system
+  labels:
+    app.kubernetes.io/name: x00
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: x00-controller
+  labels:
+    app.kubernetes.io/name: x00
+rules:
+# Core API access for pods and secrets
+- apiGroups: [""]
+  resources: ["pods", "pods/status"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+# Events for audit logging
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+# Node access for host-level info
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: x00-controller
+  labels:
+    app.kubernetes.io/name: x00
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: x00-controller
+subjects:
+- kind: ServiceAccount
+  name: x00-controller
+  namespace: x00-system

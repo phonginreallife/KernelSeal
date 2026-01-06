@@ -1,0 +1,17 @@
+# Demo Application Container
+# A simple app that X00 will monitor and inject secrets into
+
+FROM alpine:3.19
+
+RUN apk add --no-cache \
+    bash \
+    curl \
+    python3
+
+WORKDIR /app
+
+# Create a simple demo script
+COPY demo/demo-app.sh /app/demo-app.sh
+RUN chmod +x /app/demo-app.sh
+
+CMD ["/app/demo-app.sh"]

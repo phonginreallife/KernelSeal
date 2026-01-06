@@ -1,0 +1,98 @@
+# X00 Multi-stage Dockerfile
+# Builds both the BPF programs and Go binary
+# hadolint global ignore=DL3008
+
+# Stage 1: Build BPF programs
+FROM ubuntu:22.04 AS bpf-builder
+
+# Install BPF build dependencies
+# hadolint ignore=DL3009
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    clang \
+    llvm \
+    libbpf-dev \
+    make \
+    linux-headers-generic \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY bpf/ ./bpf/
+COPY Makefile ./
+
+# Generate vmlinux.h if not present and build BPF programs
+RUN make bpf || echo "BPF build skipped - will use pre-built objects"
+
+# Stage 2: Build Go binary
+FROM golang:1.22-alpine AS go-builder
+WORKDIR /app
+
+# Install build dependencies
+# hadolint ignore=DL3018
+RUN apk add --no-cache git
+
+# Copy go mod files first for caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s -X main.Version=0.1.0" \
+    -o x00 ./cmd/main.go
+
+# Stage 3: Final runtime image
+FROM debian:bookworm-slim
+
+# Security: Run apt with minimal privileges and clean up
+# hadolint ignore=DL3009
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Security: Create non-root user (X00 needs root for BPF, but prepare for future)
+RUN groupadd -r x00 && useradd -r -g x00 -s /sbin/nologin x00
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /etc/x00 /var/log/x00 /run/x00/secrets /bpf \
+    && chown -R x00:x00 /var/log/x00 /run/x00 \
+    && chmod 750 /var/log/x00 /run/x00 /run/x00/secrets
+
+# Copy BPF objects (read-only)
+COPY --from=bpf-builder --chown=root:root /app/bpf/*.bpf.o /bpf/
+RUN chmod 444 /bpf/*.bpf.o
+
+# Copy binary (read-only, executable)
+COPY --from=go-builder --chown=root:root /app/x00 /usr/local/bin/x00
+RUN chmod 555 /usr/local/bin/x00
+
+# Copy default config (read-only)
+COPY --chown=root:x00 examples/config.yaml /etc/x00/config.yaml
+RUN chmod 440 /etc/x00/config.yaml
+
+# Security labels
+LABEL org.opencontainers.image.title="X00 Security Sidecar" \
+      org.opencontainers.image.description="Kubernetes sidecar for eBPF-based secret protection" \
+      org.opencontainers.image.vendor="X00" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.source="https://github.com/YOUR_ORG/x00" \
+      security.privileged="true" \
+      security.capabilities="BPF,SYS_ADMIN,SYS_PTRACE"
+
+# Set working directory
+WORKDIR /
+
+# Health check - use shell form for proper exit handling
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD /usr/local/bin/x00 -version || exit 1
+
+# Note: X00 requires root for BPF operations
+# USER x00  # Uncomment when running non-BPF components
+
+# Default command
+ENTRYPOINT ["/usr/local/bin/x00"]
+CMD ["-config=/etc/x00/config.yaml", "-exec-monitor=/bpf/exec_monitor.bpf.o", "-lsm=/bpf/lsm_file_protect.bpf.o"]

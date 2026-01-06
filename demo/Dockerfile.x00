@@ -1,0 +1,50 @@
+# X00 Demo Container
+# Builds X00 with BPF programs for demonstration
+
+FROM ubuntu:22.04 AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    clang \
+    llvm \
+    libbpf-dev \
+    linux-headers-generic \
+    golang-go \
+    make \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy source
+COPY . .
+
+# Generate vmlinux.h if bpftool is available, otherwise use a minimal one
+RUN if command -v bpftool &> /dev/null && [ -f /sys/kernel/btf/vmlinux ]; then \
+        bpftool btf dump file /sys/kernel/btf/vmlinux format c > bpf/vmlinux.h; \
+    fi
+
+# Build BPF programs
+RUN make bpf || echo "BPF build may fail in container, using pre-built objects"
+
+# Build Go binary
+RUN CGO_ENABLED=0 go build -o x00 ./cmd/main.go
+
+# Runtime image
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    libbpf0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy binary and BPF objects
+COPY --from=builder /app/x00 /app/x00
+COPY --from=builder /app/bpf/*.bpf.o /app/bpf/
+
+# Default config location
+VOLUME /etc/x00
+
+ENTRYPOINT ["/app/x00"]
+CMD ["-config", "/etc/x00/config.yaml", "-exec-monitor", "/app/bpf/exec_monitor.bpf.o", "-lsm", "/app/bpf/lsm_file_protect.bpf.o"]

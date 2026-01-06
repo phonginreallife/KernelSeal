@@ -1,0 +1,23 @@
+# yamllint configuration
+extends: default
+
+rules:
+  line-length:
+    max: 150
+    level: warning
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no']
+  comments:
+    min-spaces-from-content: 1
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+  document-start: disable
+  empty-lines:
+    max: 2
+    max-end: 1
+
+ignore: |
+  bpf/vmlinux.h
+  vendor/
+  .git/

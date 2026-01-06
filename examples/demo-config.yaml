@@ -1,0 +1,50 @@
+# X00 Demo Configuration
+# This config injects secrets into common commands for testing
+
+version: v1
+
+policy:
+  mode: audit  # Start with audit mode to see events without blocking
+  blockEnviron: true
+  blockMem: true
+  blockMaps: false
+  blockPtrace: true
+  allowSelfRead: true
+  auditAll: true  # Log all access attempts
+
+secrets:
+  # Inject secrets into 'cat' command (for testing)
+  - name: cat-demo
+    selector:
+      binary: "cat"
+    secretRefs:
+      - name: DEMO_API_KEY
+        source:
+          envRef: "X00_DEMO_API_KEY"
+      - name: DEMO_DB_PASSWORD  
+        source:
+          envRef: "X00_DEMO_DB_PASSWORD"
+
+  # Inject secrets into 'sleep' command (for testing)
+  - name: sleep-demo
+    selector:
+      binary: "sleep"
+    secretRefs:
+      - name: DEMO_SECRET
+        source:
+          envRef: "X00_DEMO_SECRET"
+
+  # Inject secrets into Python processes
+  - name: python-demo
+    selector:
+      binary: "python3"
+    secretRefs:
+      - name: PYTHON_API_KEY
+        source:
+          envRef: "X00_PYTHON_API_KEY"
+
+monitoring:
+  enabled: true
+  metricsPort: 9090
+  logLevel: debug
+  auditLog: /tmp/x00-audit.log

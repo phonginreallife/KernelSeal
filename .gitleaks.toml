@@ -1,0 +1,68 @@
+# Gitleaks configuration for secret detection
+# https://github.com/gitleaks/gitleaks
+
+title = "X00 Gitleaks Configuration"
+
+[extend]
+# Use the default gitleaks rules as a base
+useDefault = true
+
+# Custom rules for this project
+[[rules]]
+id = "x00-api-key"
+description = "X00 API Key"
+regex = '''X00[_-]?API[_-]?KEY\s*[=:]\s*["']?[A-Za-z0-9_-]{16,}["']?'''
+tags = ["x00", "api-key"]
+
+[[rules]]
+id = "x00-db-password"
+description = "X00 Database Password"
+regex = '''X00[_-]?DB[_-]?PASSWORD\s*[=:]\s*["']?[A-Za-z0-9!@#$%^&*()_+-=]{8,}["']?'''
+tags = ["x00", "database", "password"]
+
+[[rules]]
+id = "vault-token"
+description = "HashiCorp Vault Token"
+regex = '''(?:hvs\.[a-zA-Z0-9_-]{25,}|s\.[a-zA-Z0-9]{24})'''
+tags = ["vault", "token"]
+
+[[rules]]
+id = "kubernetes-secret"
+description = "Base64 encoded Kubernetes secret data"
+regex = '''data:\s*\n\s+\w+:\s+[A-Za-z0-9+/]{40,}={0,2}'''
+tags = ["kubernetes", "secret"]
+
+# Allowlist - files and patterns that are OK to have "secrets"
+[allowlist]
+description = "Global allowlist"
+paths = [
+  # Test files with fake credentials
+  '''.*_test\.go$''',
+  # Documentation and examples
+  '''README\.md$''',
+  '''SECURITY\.md$''',
+  '''examples/.*\.yaml$''',
+  # Demo files with placeholder secrets
+  '''demo/.*''',
+  '''scripts/run-demo\.sh$''',
+  # Gitleaks config itself
+  '''\.gitleaks\.toml$''',
+]
+
+# Commits to ignore (if any known false positives)
+commits = []
+
+# Specific regex patterns to ignore
+regexes = [
+  # Demo/example placeholder values
+  '''demo-.*-\d+''',
+  '''my-secret-value''',
+  '''super-secret-password''',
+  '''placeholder''',
+  '''example''',
+  '''changeme''',
+  '''CHANGEME''',
+  # Test values
+  '''test.*password''',
+  '''test.*secret''',
+]

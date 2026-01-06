@@ -1,0 +1,6 @@
+# Trivy ignore file for known acceptable vulnerabilities
+# Format: CVE-ID or vulnerability ID, one per line
+# Add comments to explain why each is ignored
+
+# Example (remove if not needed):
+# CVE-2023-XXXXX  # Accepted risk: only affects feature we don't use
