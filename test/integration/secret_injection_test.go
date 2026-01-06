@@ -1,4 +1,4 @@
-// Package integration contains integration and system tests for X00
+// Package integration contains integration and system tests for KernelSeal
 package integration
 
 import (
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"x00/internal/secrets"
+	"kernelseal/internal/secrets"
 )
 
 // TestSecretInjection_E2E tests end-to-end secret injection
@@ -61,7 +61,7 @@ func TestSecretFile_Permissions(t *testing.T) {
 	}
 
 	// Create test secrets directory
-	testDir := filepath.Join(os.TempDir(), "x00-test-secrets")
+	testDir := filepath.Join(os.TempDir(), "kernelseal-test-secrets")
 	if err := os.MkdirAll(testDir, 0700); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}

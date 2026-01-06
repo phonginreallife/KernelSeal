@@ -1,6 +1,6 @@
 #!/bin/bash
-# X00 Docker Demo Runner
-# This script builds and runs the X00 demo with Docker
+# KernelSeal Docker Demo Runner
+# This script builds and runs the KernelSeal demo with Docker
 
 set -e
 
@@ -15,7 +15,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║           X00 Docker Demo - Secret Protection                ║${NC}"
+echo -e "${BLUE}║           KernelSeal Docker Demo - Secret Protection                ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -48,10 +48,10 @@ echo -e "${BLUE}→ Building Docker images...${NC}"
 docker-compose build
 
 echo ""
-echo -e "${GREEN}🚀 Starting X00 Demo...${NC}"
+echo -e "${GREEN}🚀 Starting KernelSeal Demo...${NC}"
 echo ""
 echo -e "${YELLOW}You will see two services:${NC}"
-echo "  • x00: The security sidecar (monitors and injects secrets)"
+echo "  • kernelseal: The security sidecar (monitors and injects secrets)"
 echo "  • demo-app: A test application"
 echo ""
 echo -e "${YELLOW}Watch for these log messages:${NC}"

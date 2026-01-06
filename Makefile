@@ -1,4 +1,4 @@
-# X00 Makefile - Build eBPF programs and Go binary
+# KernelSeal Makefile - Build eBPF programs and Go binary
 #
 # Requirements:
 # - clang >= 11 (for BPF compilation)
@@ -39,11 +39,11 @@ BPF_SOURCES := $(wildcard $(BPF_DIR)/*.bpf.c)
 BPF_OBJECTS := $(BPF_SOURCES:.c=.o)
 
 # Binary name
-BINARY := x00
+BINARY := kernelseal
 
 # Container settings
 REGISTRY ?= your-registry
-IMAGE_NAME := x00
+IMAGE_NAME := kernelseal
 IMAGE_TAG ?= latest
 
 .PHONY: all
@@ -64,14 +64,14 @@ $(BPF_DIR)/vmlinux.h:
 bpf: $(BPF_OBJECTS)
 	@echo "✅ BPF programs compiled"
 
-$(BPF_DIR)/%.bpf.o: $(BPF_DIR)/%.bpf.c $(BPF_DIR)/vmlinux.h $(BPF_DIR)/x00_common.h
+$(BPF_DIR)/%.bpf.o: $(BPF_DIR)/%.bpf.c $(BPF_DIR)/vmlinux.h $(BPF_DIR)/kernelseal_common.h
 	@echo "🔨 Compiling $<..."
 	$(CLANG) $(BPF_CFLAGS) -c $< -o $@
 	$(LLVM_STRIP) -g $@
 
 .PHONY: build
 build:
-	@echo "🔨 Building X00 binary..."
+	@echo "🔨 Building KernelSeal binary..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build -o $(BUILD_DIR)/$(BINARY) ./$(CMD_DIR)/main.go
 	@echo "✅ Binary built: $(BUILD_DIR)/$(BINARY)"
@@ -171,18 +171,18 @@ verify-bpf:
 	@echo "🔍 Verifying BPF programs..."
 	@for obj in $(BPF_OBJECTS); do \
 		echo "Checking $$obj..."; \
-		$(BPFTOOL) prog load $$obj /sys/fs/bpf/x00_test 2>&1 || true; \
-		rm -f /sys/fs/bpf/x00_test 2>/dev/null || true; \
+		$(BPFTOOL) prog load $$obj /sys/fs/bpf/kernelseal_test 2>&1 || true; \
+		rm -f /sys/fs/bpf/kernelseal_test 2>/dev/null || true; \
 	done
 
 .PHONY: run
 run: all
-	@echo "🚀 Running X00..."
+	@echo "🚀 Running KernelSeal..."
 	sudo $(BUILD_DIR)/$(BINARY) -config examples/config.yaml
 
 .PHONY: help
 help:
-	@echo "X00 Build System"
+	@echo "KernelSeal Build System"
 	@echo ""
 	@echo "Targets:"
 	@echo "  all          - Build everything (vmlinux, bpf, go binary)"
@@ -197,5 +197,5 @@ help:
 	@echo "  clean-all    - Clean all generated files including vmlinux.h"
 	@echo "  install-deps - Install build dependencies"
 	@echo "  verify-bpf   - Verify BPF programs can be loaded"
-	@echo "  run          - Build and run X00"
+	@echo "  run          - Build and run KernelSeal"
 	@echo "  help         - Show this help"

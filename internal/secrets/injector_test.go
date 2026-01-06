@@ -147,7 +147,7 @@ func TestParseEnviron(t *testing.T) {
 	}{
 		{
 			name:  "Normal environ",
-			input: []byte("PATH=/usr/bin\x00HOME=/home/user\x00SHELL=/bin/bash\x00"),
+			input: []byte("PATH=/usr/bin\kernelsealHOME=/home/user\kernelsealSHELL=/bin/bash\kernelseal"),
 			expected: map[string]string{
 				"PATH":  "/usr/bin",
 				"HOME":  "/home/user",
@@ -161,12 +161,12 @@ func TestParseEnviron(t *testing.T) {
 		},
 		{
 			name:     "Single entry",
-			input:    []byte("FOO=bar\x00"),
+			input:    []byte("FOO=bar\kernelseal"),
 			expected: map[string]string{"FOO": "bar"},
 		},
 		{
 			name:  "Value with equals sign",
-			input: []byte("CONN=host=localhost;port=5432\x00"),
+			input: []byte("CONN=host=localhost;port=5432\kernelseal"),
 			expected: map[string]string{
 				"CONN": "host=localhost;port=5432",
 			},

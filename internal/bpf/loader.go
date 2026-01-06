@@ -1,4 +1,4 @@
-// Package bpf handles loading and managing eBPF programs for X00
+// Package bpf handles loading and managing eBPF programs for KernelSeal
 package bpf
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 
-	"x00/internal/types"
+	"kernelseal/internal/types"
 )
 
 // Manager handles all BPF program loading and event processing
@@ -49,10 +49,10 @@ type execObjects struct {
 
 // lsmObjects holds the LSM BPF objects
 type lsmObjects struct {
-	X00FileOpen          *ebpf.Program `ebpf:"x00_file_open"`
-	X00PtraceAccessCheck *ebpf.Program `ebpf:"x00_ptrace_access_check"`
+	KernelSealFileOpen          *ebpf.Program `ebpf:"kernelseal_file_open"`
+	KernelSealPtraceAccessCheck *ebpf.Program `ebpf:"kernelseal_ptrace_access_check"`
 	Events               *ebpf.Map     `ebpf:"events"`
-	X00AllowedPids       *ebpf.Map     `ebpf:"x00_allowed_pids"`
+	KernelSealAllowedPids       *ebpf.Map     `ebpf:"kernelseal_allowed_pids"`
 	ProtectedPids        *ebpf.Map     `ebpf:"protected_pids"`
 	PolicyConfig         *ebpf.Map     `ebpf:"policy_config"`
 }
@@ -140,9 +140,9 @@ func (m *Manager) LoadLSM(objectPath string) error {
 	}
 
 	// Attach LSM hooks
-	if m.lsmObjs.X00FileOpen != nil {
+	if m.lsmObjs.KernelSealFileOpen != nil {
 		fileOpenLink, attachErr := link.AttachLSM(link.LSMOptions{
-			Program: m.lsmObjs.X00FileOpen,
+			Program: m.lsmObjs.KernelSealFileOpen,
 		})
 		if attachErr != nil {
 			log.Printf("[WARN] Failed to attach file_open LSM: %v", attachErr)
@@ -151,9 +151,9 @@ func (m *Manager) LoadLSM(objectPath string) error {
 		}
 	}
 
-	if m.lsmObjs.X00PtraceAccessCheck != nil {
+	if m.lsmObjs.KernelSealPtraceAccessCheck != nil {
 		ptraceLink, attachErr := link.AttachLSM(link.LSMOptions{
-			Program: m.lsmObjs.X00PtraceAccessCheck,
+			Program: m.lsmObjs.KernelSealPtraceAccessCheck,
 		})
 		if attachErr != nil {
 			log.Printf("[WARN] Failed to attach ptrace LSM: %v", attachErr)
@@ -190,14 +190,14 @@ func (m *Manager) ConfigurePolicy(policy types.PolicyConfig) error {
 	return nil
 }
 
-// AllowPID adds a PID to the allowed list (X00 sidecar processes)
+// AllowPID adds a PID to the allowed list (KernelSeal sidecar processes)
 func (m *Manager) AllowPID(pid uint32) error {
-	if m.lsmObjs.X00AllowedPids == nil {
+	if m.lsmObjs.KernelSealAllowedPids == nil {
 		return nil // LSM not loaded
 	}
 
 	value := uint8(1)
-	if err := m.lsmObjs.X00AllowedPids.Put(pid, value); err != nil {
+	if err := m.lsmObjs.KernelSealAllowedPids.Put(pid, value); err != nil {
 		return fmt.Errorf("failed to add allowed PID %d: %w", pid, err)
 	}
 

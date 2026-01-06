@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
-// X00 Exec Monitor: Detect process execution for secret injection
+// KernelSeal Exec Monitor: Detect process execution for secret injection
 
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
-#include "x00_common.h"
+#include "kernelseal_common.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
@@ -123,7 +123,7 @@ int handle_sys_enter_execve(struct trace_event_raw_sys_enter *ctx) {
     bpf_map_update_elem(&seen_pids, &pid, &now, BPF_ANY);
     
     // Reserve space in ring buffer
-    struct x00_exec_event *event;
+    struct ks_exec_event *event;
     event = bpf_ringbuf_reserve(&exec_events, sizeof(*event), 0);
     if (!event)
         return 0;
@@ -135,7 +135,7 @@ int handle_sys_enter_execve(struct trace_event_raw_sys_enter *ctx) {
     event->uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
     event->gid = bpf_get_current_uid_gid() >> 32;
     event->cgroup_id = cgid;
-    event->event_type = X00_EVENT_EXEC;
+    event->event_type = KS_EVENT_EXEC;
     
     // Get parent PID
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
@@ -207,7 +207,7 @@ int handle_sched_process_exec(void *ctx) {
     bpf_map_update_elem(&seen_pids, &pid, &now, BPF_ANY);
     
     // If we reach here, this binary should be monitored
-    struct x00_exec_event *event;
+    struct ks_exec_event *event;
     event = bpf_ringbuf_reserve(&exec_events, sizeof(*event), 0);
     if (!event)
         return 0;
@@ -218,7 +218,7 @@ int handle_sched_process_exec(void *ctx) {
     event->uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
     event->gid = bpf_get_current_uid_gid() >> 32;
     event->cgroup_id = cgid;
-    event->event_type = X00_EVENT_EXEC;
+    event->event_type = KS_EVENT_EXEC;
     
     // Get parent PID
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
@@ -266,7 +266,7 @@ int handle_sched_process_exit(void *ctx) {
         return 0;
     
     // Send exit event
-    struct x00_exec_event *event;
+    struct ks_exec_event *event;
     event = bpf_ringbuf_reserve(&exec_events, sizeof(*event), 0);
     if (!event)
         return 0;
@@ -277,7 +277,7 @@ int handle_sched_process_exit(void *ctx) {
     event->uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
     event->gid = bpf_get_current_uid_gid() >> 32;
     event->cgroup_id = cgid;
-    event->event_type = X00_EVENT_EXIT;
+    event->event_type = KS_EVENT_EXIT;
     event->ppid = 0;
     
     bpf_get_current_comm(&event->comm, sizeof(event->comm));

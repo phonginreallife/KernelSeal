@@ -1,4 +1,4 @@
-module x00
+module kernelseal
 
 go 1.22
 

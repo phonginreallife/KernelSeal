@@ -1,6 +1,6 @@
 #!/bin/bash
-# X00 Local Demo Script
-# This script runs X00 locally and demonstrates secret injection
+# KernelSeal Local Demo Script
+# This script runs KernelSeal locally and demonstrates secret injection
 
 set -e
 
@@ -17,7 +17,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║              X00 Secret Protection Demo                      ║${NC}"
+echo -e "${BLUE}║              KernelSeal Secret Protection Demo                      ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -31,10 +31,10 @@ fi
 # Set demo secrets as environment variables
 # ⚠️ SECURITY: These are DEMO/PLACEHOLDER values only!
 # Never use these in production - replace with real secrets from a secret manager
-export X00_DEMO_API_KEY="${X00_DEMO_API_KEY:-demo-placeholder-api-key}"
-export X00_DEMO_DB_PASSWORD="${X00_DEMO_DB_PASSWORD:-demo-placeholder-password}"
-export X00_DEMO_SECRET="${X00_DEMO_SECRET:-demo-placeholder-secret}"
-export X00_PYTHON_API_KEY="${X00_PYTHON_API_KEY:-demo-placeholder-python-key}"
+export KernelSeal_DEMO_API_KEY="${KernelSeal_DEMO_API_KEY:-demo-placeholder-api-key}"
+export KernelSeal_DEMO_DB_PASSWORD="${KernelSeal_DEMO_DB_PASSWORD:-demo-placeholder-password}"
+export KernelSeal_DEMO_SECRET="${KernelSeal_DEMO_SECRET:-demo-placeholder-secret}"
+export KernelSeal_PYTHON_API_KEY="${KernelSeal_PYTHON_API_KEY:-demo-placeholder-python-key}"
 
 echo -e "${GREEN}✓ Demo secrets set in environment${NC}"
 echo ""
@@ -61,9 +61,9 @@ fi
 echo -e "${GREEN}✓ BPF objects ready${NC}"
 
 # Build Go binary
-echo -e "${BLUE}→ Building X00 binary...${NC}"
-go build -o build/x00 ./cmd/main.go
-echo -e "${GREEN}✓ Binary built: build/x00${NC}"
+echo -e "${BLUE}→ Building KernelSeal binary...${NC}"
+go build -o build/kernelseal ./cmd/main.go
+echo -e "${GREEN}✓ Binary built: build/kernelseal${NC}"
 echo ""
 
 # Show the configuration
@@ -79,9 +79,9 @@ echo ""
 echo "  Policy: audit mode (log but don't block)"
 echo ""
 
-# Run X00
+# Run KernelSeal
 echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}🚀 Starting X00...${NC}"
+echo -e "${GREEN}🚀 Starting KernelSeal...${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "${YELLOW}In another terminal, try these commands to trigger secret injection:${NC}"
@@ -90,11 +90,11 @@ echo "    cat /etc/hostname"
 echo "    sleep 5"
 echo "    python3 -c 'print(\"hello\")'"
 echo ""
-echo -e "${YELLOW}Press Ctrl+C to stop X00${NC}"
+echo -e "${YELLOW}Press Ctrl+C to stop KernelSeal${NC}"
 echo ""
 
-# Run X00 with demo config
-exec ./build/x00 \
+# Run KernelSeal with demo config
+exec ./build/kernelseal \
     -config examples/demo-config.yaml \
     -exec-monitor bpf/exec_monitor.bpf.o \
     -lsm bpf/lsm_file_protect.bpf.o

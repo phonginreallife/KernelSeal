@@ -1,38 +1,38 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
-// X00 Common types shared between BPF programs and Go user space
+// KernelSeal Common types shared between BPF programs and Go user space
 
-#ifndef __X00_COMMON_H__
-#define __X00_COMMON_H__
+#ifndef __KS_COMMON_H__
+#define __KS_COMMON_H__
 
 #define MAX_PATH_LEN 256
 #define MAX_COMM_LEN 16
 #define MAX_FILENAME_LEN 256
 
 // Event types sent from BPF to user space
-enum x00_event_type {
-    X00_EVENT_EXEC      = 1,  // Process executed
-    X00_EVENT_EXIT      = 2,  // Process exited
-    X00_EVENT_BLOCKED   = 3,  // Access blocked by LSM
-    X00_EVENT_AUDIT     = 4,  // Audit log (not blocked)
+enum ks_event_type {
+    KS_EVENT_EXEC      = 1,  // Process executed
+    KS_EVENT_EXIT      = 2,  // Process exited
+    KS_EVENT_BLOCKED   = 3,  // Access blocked by LSM
+    KS_EVENT_AUDIT     = 4,  // Audit log (not blocked)
 };
 
 // Access types for LSM events
-enum x00_access_type {
-    X00_ACCESS_ENVIRON  = 0,
-    X00_ACCESS_MEM      = 1,
-    X00_ACCESS_MAPS     = 2,
-    X00_ACCESS_PTRACE   = 3,
+enum ks_access_type {
+    KS_ACCESS_ENVIRON  = 0,
+    KS_ACCESS_MEM      = 1,
+    KS_ACCESS_MAPS     = 2,
+    KS_ACCESS_PTRACE   = 3,
 };
 
 // Policy enforcement modes
-enum x00_enforce_mode {
-    X00_MODE_DISABLED   = 0,
-    X00_MODE_AUDIT      = 1,  // Log only, don't block
-    X00_MODE_ENFORCE    = 2,  // Log and block
+enum ks_enforce_mode {
+    KS_MODE_DISABLED   = 0,
+    KS_MODE_AUDIT      = 1,  // Log only, don't block
+    KS_MODE_ENFORCE    = 2,  // Log and block
 };
 
 // Exec event sent to user space for secret injection decisions
-struct x00_exec_event {
+struct ks_exec_event {
     __u64 timestamp;
     __u32 pid;
     __u32 tgid;
@@ -40,14 +40,14 @@ struct x00_exec_event {
     __u32 uid;
     __u32 gid;
     __u64 cgroup_id;         // For container identification
-    __u8  event_type;        // x00_event_type
+    __u8  event_type;        // ks_event_type
     __u8  reserved[3];
     char  comm[MAX_COMM_LEN];
     char  filename[MAX_FILENAME_LEN];
 };
 
 // LSM audit/block event
-struct x00_lsm_event {
+struct ks_lsm_event {
     __u64 timestamp;
     __u32 pid;
     __u32 tgid;
@@ -61,8 +61,8 @@ struct x00_lsm_event {
 };
 
 // Policy configuration structure
-struct x00_policy_config {
-    __u8 enforce_mode;       // x00_enforce_mode
+struct ks_policy_config {
+    __u8 enforce_mode;       // ks_enforce_mode
     __u8 block_environ;      // Block /proc/*/environ reads
     __u8 block_mem;          // Block /proc/*/mem reads
     __u8 block_maps;         // Block /proc/*/maps reads  
@@ -72,4 +72,4 @@ struct x00_policy_config {
     __u8 reserved;
 };
 
-#endif /* __X00_COMMON_H__ */
+#endif /* __KS_COMMON_H__ */

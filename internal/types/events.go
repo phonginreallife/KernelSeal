@@ -1,4 +1,4 @@
-// Package types defines shared data structures for X00
+// Package types defines shared data structures for KernelSeal
 package types
 
 // EventType defines the type of BPF event
@@ -74,7 +74,7 @@ func (m EnforceMode) String() string {
 }
 
 // ExecEvent represents a process execution event from BPF
-// Must match struct x00_exec_event in x00_common.h exactly
+// Must match struct kernelseal_exec_event in kernelseal_common.h exactly
 type ExecEvent struct {
 	Timestamp uint64
 	PID       uint32

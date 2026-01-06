@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
-// X00 BPF-LSM: Protect /proc/$pid/environ and /proc/$pid/mem from unauthorized reads
+// KernelSeal BPF-LSM: Protect /proc/$pid/environ and /proc/$pid/mem from unauthorized reads
 
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
@@ -17,13 +17,13 @@ struct {
     __uint(max_entries, 256 * 1024); // 256KB ring buffer
 } events SEC(".maps");
 
-// Map to store PIDs of X00 sidecar processes (allowed to access protected files)
+// Map to store PIDs of KernelSeal sidecar processes (allowed to access protected files)
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 64);
     __type(key, __u32);   // PID
     __type(value, __u8);  // 1 = allowed
-} x00_allowed_pids SEC(".maps");
+} ks_allowed_pids SEC(".maps");
 
 // Map to store protected PIDs (processes that have received secrets)
 struct {
@@ -38,11 +38,11 @@ struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
     __uint(max_entries, 1);
     __type(key, __u32);
-    __type(value, struct x00_policy);
+    __type(value, struct ks_policy);
 } policy_config SEC(".maps");
 
 // Audit event structure sent to user space
-struct x00_audit_event {
+struct ks_audit_event {
     __u64 timestamp;
     __u32 pid;
     __u32 tgid;
@@ -55,7 +55,7 @@ struct x00_audit_event {
 };
 
 // Policy structure
-struct x00_policy {
+struct ks_policy {
     __u8 enforce_mode;         // 0=disabled, 1=audit, 2=enforce
     __u8 block_environ_read;   // Block /proc/*/environ
     __u8 block_mem_read;       // Block /proc/*/mem
@@ -128,7 +128,7 @@ static __always_inline void send_audit_event(
     __u32 pid, __u32 tgid, __u32 uid, __u32 target_pid,
     __u8 event_type, __u8 access_type, const char *path) 
 {
-    struct x00_audit_event *event;
+    struct ks_audit_event *event;
     
     event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
     if (!event)
@@ -150,7 +150,7 @@ static __always_inline void send_audit_event(
 
 // LSM hook: file_open - Called when a file is opened
 SEC("lsm/file_open")
-int BPF_PROG(x00_file_open, struct file *file) {
+int BPF_PROG(ks_file_open, struct file *file) {
     // Get current process info
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
@@ -159,14 +159,14 @@ int BPF_PROG(x00_file_open, struct file *file) {
     
     // Get policy configuration
     __u32 key = 0;
-    struct x00_policy *policy = bpf_map_lookup_elem(&policy_config, &key);
+    struct ks_policy *policy = bpf_map_lookup_elem(&policy_config, &key);
     if (!policy || policy->enforce_mode == 0)
         return 0;  // Policy disabled
     
-    // Check if this is an X00 allowed process
-    __u8 *allowed = bpf_map_lookup_elem(&x00_allowed_pids, &pid);
+    // Check if this is an KernelSeal allowed process
+    __u8 *allowed = bpf_map_lookup_elem(&ks_allowed_pids, &pid);
     if (allowed && *allowed == 1)
-        return 0;  // X00 sidecar is always allowed
+        return 0;  // KernelSeal sidecar is always allowed
     
     // Get the path from the dentry
     struct path f_path;
@@ -305,7 +305,7 @@ int BPF_PROG(x00_file_open, struct file *file) {
 
 // LSM hook: ptrace_access_check - Block ptrace to protected processes
 SEC("lsm/ptrace_access_check")
-int BPF_PROG(x00_ptrace_access_check, struct task_struct *child, unsigned int mode) {
+int BPF_PROG(ks_ptrace_access_check, struct task_struct *child, unsigned int mode) {
     // Get current process info
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
@@ -313,12 +313,12 @@ int BPF_PROG(x00_ptrace_access_check, struct task_struct *child, unsigned int mo
     
     // Get policy configuration
     __u32 key = 0;
-    struct x00_policy *policy = bpf_map_lookup_elem(&policy_config, &key);
+    struct ks_policy *policy = bpf_map_lookup_elem(&policy_config, &key);
     if (!policy || policy->enforce_mode == 0 || !policy->block_ptrace)
         return 0;
     
-    // Check if this is an X00 allowed process
-    __u8 *allowed = bpf_map_lookup_elem(&x00_allowed_pids, &pid);
+    // Check if this is an KernelSeal allowed process
+    __u8 *allowed = bpf_map_lookup_elem(&ks_allowed_pids, &pid);
     if (allowed && *allowed == 1)
         return 0;
     
