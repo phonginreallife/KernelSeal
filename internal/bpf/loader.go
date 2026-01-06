@@ -49,12 +49,12 @@ type execObjects struct {
 
 // lsmObjects holds the LSM BPF objects
 type lsmObjects struct {
-	KernelSealFileOpen          *ebpf.Program `ebpf:"kernelseal_file_open"`
-	KernelSealPtraceAccessCheck *ebpf.Program `ebpf:"kernelseal_ptrace_access_check"`
-	Events                      *ebpf.Map     `ebpf:"events"`
-	KernelSealAllowedPids       *ebpf.Map     `ebpf:"kernelseal_allowed_pids"`
-	ProtectedPids               *ebpf.Map     `ebpf:"protected_pids"`
-	PolicyConfig                *ebpf.Map     `ebpf:"policy_config"`
+	KsFileOpen          *ebpf.Program `ebpf:"ks_file_open"`
+	KsPtraceAccessCheck *ebpf.Program `ebpf:"ks_ptrace_access_check"`
+	Events              *ebpf.Map     `ebpf:"events"`
+	KsAllowedPids       *ebpf.Map     `ebpf:"ks_allowed_pids"`
+	ProtectedPids       *ebpf.Map     `ebpf:"protected_pids"`
+	PolicyConfig        *ebpf.Map     `ebpf:"policy_config"`
 }
 
 // NewManager creates a new BPF manager
@@ -140,9 +140,9 @@ func (m *Manager) LoadLSM(objectPath string) error {
 	}
 
 	// Attach LSM hooks
-	if m.lsmObjs.KernelSealFileOpen != nil {
+	if m.lsmObjs.KsFileOpen != nil {
 		fileOpenLink, attachErr := link.AttachLSM(link.LSMOptions{
-			Program: m.lsmObjs.KernelSealFileOpen,
+			Program: m.lsmObjs.KsFileOpen,
 		})
 		if attachErr != nil {
 			log.Printf("[WARN] Failed to attach file_open LSM: %v", attachErr)
@@ -151,9 +151,9 @@ func (m *Manager) LoadLSM(objectPath string) error {
 		}
 	}
 
-	if m.lsmObjs.KernelSealPtraceAccessCheck != nil {
+	if m.lsmObjs.KsPtraceAccessCheck != nil {
 		ptraceLink, attachErr := link.AttachLSM(link.LSMOptions{
-			Program: m.lsmObjs.KernelSealPtraceAccessCheck,
+			Program: m.lsmObjs.KsPtraceAccessCheck,
 		})
 		if attachErr != nil {
 			log.Printf("[WARN] Failed to attach ptrace LSM: %v", attachErr)
@@ -192,12 +192,12 @@ func (m *Manager) ConfigurePolicy(policy types.PolicyConfig) error {
 
 // AllowPID adds a PID to the allowed list (KernelSeal sidecar processes)
 func (m *Manager) AllowPID(pid uint32) error {
-	if m.lsmObjs.KernelSealAllowedPids == nil {
+	if m.lsmObjs.KsAllowedPids == nil {
 		return nil // LSM not loaded
 	}
 
 	value := uint8(1)
-	if err := m.lsmObjs.KernelSealAllowedPids.Put(pid, value); err != nil {
+	if err := m.lsmObjs.KsAllowedPids.Put(pid, value); err != nil {
 		return fmt.Errorf("failed to add allowed PID %d: %w", pid, err)
 	}
 
