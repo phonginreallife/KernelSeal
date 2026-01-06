@@ -116,7 +116,7 @@ func (m *Manager) LoadExecMonitor(objectPath string) error {
 		return fmt.Errorf("failed to create exec ring buffer reader: %w", err)
 	}
 
-	log.Println("✅ Exec monitor BPF programs loaded and attached")
+	log.Println("[OK] Exec monitor BPF programs loaded and attached")
 	return nil
 }
 
@@ -124,7 +124,7 @@ func (m *Manager) LoadExecMonitor(objectPath string) error {
 func (m *Manager) LoadLSM(objectPath string) error {
 	// Check if BPF LSM is available
 	if !isLSMAvailable() {
-		log.Println("⚠️  BPF-LSM not available, running in audit-only mode")
+		log.Println("[WARN] BPF-LSM not available, running in audit-only mode")
 		return nil
 	}
 
@@ -135,7 +135,7 @@ func (m *Manager) LoadLSM(objectPath string) error {
 
 	if loadErr := spec.LoadAndAssign(&m.lsmObjs, nil); loadErr != nil {
 		// LSM programs may fail to load if BPF_LSM is not enabled
-		log.Printf("⚠️  LSM programs not loaded (BPF-LSM may not be enabled): %v", loadErr)
+		log.Printf("[WARN] LSM programs not loaded (BPF-LSM may not be enabled): %v", loadErr)
 		return nil
 	}
 
@@ -145,7 +145,7 @@ func (m *Manager) LoadLSM(objectPath string) error {
 			Program: m.lsmObjs.X00FileOpen,
 		})
 		if attachErr != nil {
-			log.Printf("⚠️  Failed to attach file_open LSM: %v", attachErr)
+			log.Printf("[WARN] Failed to attach file_open LSM: %v", attachErr)
 		} else {
 			m.lsmLinks = append(m.lsmLinks, fileOpenLink)
 		}
@@ -156,7 +156,7 @@ func (m *Manager) LoadLSM(objectPath string) error {
 			Program: m.lsmObjs.X00PtraceAccessCheck,
 		})
 		if attachErr != nil {
-			log.Printf("⚠️  Failed to attach ptrace LSM: %v", attachErr)
+			log.Printf("[WARN] Failed to attach ptrace LSM: %v", attachErr)
 		} else {
 			m.lsmLinks = append(m.lsmLinks, ptraceLink)
 		}
@@ -170,7 +170,7 @@ func (m *Manager) LoadLSM(objectPath string) error {
 		}
 	}
 
-	log.Println("✅ LSM BPF programs loaded and attached")
+	log.Println("[OK] LSM BPF programs loaded and attached")
 	return nil
 }
 
@@ -185,7 +185,7 @@ func (m *Manager) ConfigurePolicy(policy types.PolicyConfig) error {
 		return fmt.Errorf("failed to update policy config: %w", err)
 	}
 
-	log.Printf("🔧 Policy configured: mode=%s, environ=%v, mem=%v, ptrace=%v",
+	log.Printf("[CONFIG] Policy configured: mode=%s, environ=%v, mem=%v, ptrace=%v",
 		policy.EnforceMode, policy.BlockEnviron == 1, policy.BlockMem == 1, policy.BlockPtrace == 1)
 	return nil
 }
@@ -201,7 +201,7 @@ func (m *Manager) AllowPID(pid uint32) error {
 		return fmt.Errorf("failed to add allowed PID %d: %w", pid, err)
 	}
 
-	log.Printf("🔓 PID %d added to allowed list", pid)
+	log.Printf("[ALLOW] PID %d added to allowed list", pid)
 	return nil
 }
 
@@ -216,7 +216,7 @@ func (m *Manager) ProtectPID(pid uint32) error {
 		return fmt.Errorf("failed to protect PID %d: %w", pid, err)
 	}
 
-	log.Printf("🛡️  PID %d marked as protected", pid)
+	log.Printf("[PROTECT] PID %d marked as protected", pid)
 	return nil
 }
 
@@ -282,7 +282,7 @@ func (m *Manager) AddTargetBinary(binaryName string) error {
 		return fmt.Errorf("failed to add target binary %s: %w", binaryName, err)
 	}
 
-	log.Printf("🎯 Added target binary for kernel filtering: %s", binaryName)
+	log.Printf("[FILTER] Added target binary for kernel filtering: %s", binaryName)
 	return nil
 }
 
@@ -320,9 +320,9 @@ func (m *Manager) EnableBinaryFilter(enabled bool) error {
 	}
 
 	if enabled {
-		log.Println("🔍 Kernel-side binary filtering ENABLED - only configured binaries will be monitored")
+		log.Println("[FILTER] Kernel-side binary filtering ENABLED - only configured binaries will be monitored")
 	} else {
-		log.Println("🔍 Kernel-side binary filtering DISABLED - all processes will be monitored")
+		log.Println("[FILTER] Kernel-side binary filtering DISABLED - all processes will be monitored")
 	}
 
 	return nil
@@ -376,7 +376,7 @@ func (m *Manager) Stop() {
 		l.Close()
 	}
 
-	log.Println("🛑 BPF manager stopped")
+	log.Println("[STOP] BPF manager stopped")
 }
 
 func (m *Manager) processExecEvents() {

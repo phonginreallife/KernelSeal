@@ -28,7 +28,7 @@ func main() {
 	lsmPath := flag.String("lsm", defaultLSMPath, "Path to LSM BPF object")
 	flag.Parse()
 
-	log.Println("🚀 Starting X00 Sidecar - Secret Protection System")
+	log.Println("[START] Starting X00 Sidecar - Secret Protection System")
 	log.Printf("   Version: 0.1.0")
 	log.Printf("   Config: %s", *configPath)
 
@@ -40,29 +40,29 @@ func main() {
 	// Load configuration if it exists
 	if _, err := os.Stat(*configPath); err == nil {
 		if err := policyManager.LoadConfig(*configPath); err != nil {
-			log.Printf("⚠️  Failed to load config: %v (using defaults)", err)
+			log.Printf("[WARN] Failed to load config: %v (using defaults)", err)
 		}
 	} else {
-		log.Printf("📋 Config file not found, using defaults")
+		log.Printf("[INFO] Config file not found, using defaults")
 	}
 
 	// Set up BPF policy update callback
 	policyManager.SetPolicyUpdateCallback(func(policy types.PolicyConfig) {
 		if err := bpfManager.ConfigurePolicy(policy); err != nil {
-			log.Printf("⚠️  Failed to update BPF policy: %v", err)
+			log.Printf("[WARN] Failed to update BPF policy: %v", err)
 		}
 	})
 
 	// Set up secret injection callback
 	secretInjector.SetInjectedCallback(func(pid uint32) {
 		if err := bpfManager.ProtectPID(pid); err != nil {
-			log.Printf("⚠️  Failed to protect PID %d: %v", pid, err)
+			log.Printf("[WARN] Failed to protect PID %d: %v", pid, err)
 		}
 	})
 
 	// Load BPF programs
 	if err := bpfManager.LoadExecMonitor(*execMonitorPath); err != nil {
-		log.Fatalf("❌ Failed to load exec monitor: %v", err)
+		log.Fatalf("[ERROR] Failed to load exec monitor: %v", err)
 	}
 
 	// Configure kernel-side binary filtering
@@ -73,36 +73,36 @@ func main() {
 	if kernelFilterEnabled && len(targetBinaries) > 0 {
 		for _, binary := range targetBinaries {
 			if err := bpfManager.AddTargetBinary(binary); err != nil {
-				log.Printf("⚠️  Failed to add target binary %s: %v", binary, err)
+				log.Printf("[WARN] Failed to add target binary %s: %v", binary, err)
 			}
 		}
 		// Enable kernel-side filtering
 		if err := bpfManager.EnableBinaryFilter(true); err != nil {
-			log.Printf("⚠️  Failed to enable binary filter: %v", err)
+			log.Printf("[WARN] Failed to enable binary filter: %v", err)
 		}
-		log.Printf("🎯 Kernel-side filtering enabled for %d binaries: %v", len(targetBinaries), targetBinaries)
+		log.Printf("[FILTER] Kernel-side filtering enabled for %d binaries: %v", len(targetBinaries), targetBinaries)
 	} else if !kernelFilterEnabled {
-		log.Println("🔍 Kernel-side binary filtering DISABLED by config - monitoring all processes")
+		log.Println("[FILTER] Kernel-side binary filtering DISABLED by config - monitoring all processes")
 	} else {
-		log.Println("⚠️  No target binaries configured - monitoring all processes (not recommended for production)")
+		log.Println("[WARN] No target binaries configured - monitoring all processes (not recommended for production)")
 	}
 
 	// Try to load LSM (may not be available on all kernels)
 	if err := bpfManager.LoadLSM(*lsmPath); err != nil {
-		log.Printf("⚠️  LSM not loaded: %v", err)
+		log.Printf("[WARN] LSM not loaded: %v", err)
 	}
 
 	// Allow our own PID to access protected files
 	// #nosec G115 - PID is always positive and fits in uint32
 	ownPID := uint32(os.Getpid()) //nolint:gosec
 	if err := bpfManager.AllowPID(ownPID); err != nil {
-		log.Printf("⚠️  Failed to allow own PID: %v", err)
+		log.Printf("[WARN] Failed to allow own PID: %v", err)
 	}
 
 	// Configure initial policy
 	policy := policyManager.GetBPFPolicy()
 	if err := bpfManager.ConfigurePolicy(policy); err != nil {
-		log.Printf("⚠️  Failed to configure policy: %v", err)
+		log.Printf("[WARN] Failed to configure policy: %v", err)
 	}
 
 	// Set up event handlers
@@ -117,7 +117,7 @@ func main() {
 	// Start processing events
 	bpfManager.Start()
 
-	log.Println("✅ X00 Sidecar running - monitoring for process execution")
+	log.Println("[OK] X00 Sidecar running - monitoring for process execution")
 	log.Println("   Press Ctrl+C to stop")
 
 	// Wait for shutdown signal
@@ -125,9 +125,9 @@ func main() {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	<-sigs
 
-	log.Println("🛑 Shutting down X00...")
+	log.Println("[STOP] Shutting down X00...")
 	bpfManager.Stop()
-	log.Println("👋 X00 stopped")
+	log.Println("[DONE] X00 stopped")
 }
 
 // handleExecEvent processes exec events from BPF
@@ -145,7 +145,7 @@ func handleExecEvent(event *types.ExecEvent, pm *internal.PolicyManager,
 			binaryName = filename[idx+1:]
 		}
 
-		log.Printf("📍 EXEC: PID=%d PPID=%d Comm=%s File=%s Binary=%s CgroupID=%d",
+		log.Printf("[EXEC] PID=%d PPID=%d Comm=%s File=%s Binary=%s CgroupID=%d",
 			event.PID, event.PPID, comm, filename, binaryName, event.CgroupID)
 
 		// Check if we should inject secrets into this process (match on binary name)
@@ -153,23 +153,23 @@ func handleExecEvent(event *types.ExecEvent, pm *internal.PolicyManager,
 		if len(secretsList) > 0 {
 			result := injector.InjectSecrets(event.PID, secretsList)
 			if result.Success {
-				log.Printf("💉 Secrets injected into PID %d: %v", event.PID, result.Secrets)
+				log.Printf("[INJECT] Secrets injected into PID %d: %v", event.PID, result.Secrets)
 			} else {
-				log.Printf("❌ Failed to inject secrets into PID %d: %v", event.PID, result.Error)
+				log.Printf("[ERROR] Failed to inject secrets into PID %d: %v", event.PID, result.Error)
 			}
 		}
 
 	case types.EventExit:
-		log.Printf("📍 EXIT: PID=%d Comm=%s", event.PID, event.GetComm())
+		log.Printf("[EXIT] PID=%d Comm=%s", event.PID, event.GetComm())
 
 		// Clean up secrets for exited process
 		if err := injector.CleanupSecrets(event.PID); err != nil {
-			log.Printf("⚠️  Cleanup error: %v", err)
+			log.Printf("[WARN] Cleanup error: %v", err)
 		}
 
 		// Remove from protected list
 		if err := bpfMgr.UnprotectPID(event.PID); err != nil {
-			log.Printf("⚠️  Failed to unprotect PID %d: %v", event.PID, err)
+			log.Printf("[WARN] Failed to unprotect PID %d: %v", event.PID, err)
 		}
 	}
 }
@@ -183,6 +183,6 @@ func handleLSMEvent(event *types.LSMEvent) {
 
 	accessStr := event.AccessType.String()
 
-	log.Printf("🛡️  LSM %s: PID=%d attempted %s access to PID=%d (%s)",
+	log.Printf("[LSM %s] PID=%d attempted %s access to PID=%d (%s)",
 		eventStr, event.PID, accessStr, event.TargetPID, event.GetComm())
 }

@@ -170,7 +170,7 @@ func (pm *PolicyManager) LoadConfig(path string) error {
 	pm.config = config
 	pm.mu.Unlock()
 
-	log.Printf("📋 Loaded X00 configuration from %s", path)
+	log.Printf("[CONFIG] Loaded X00 configuration from %s", path)
 
 	// Apply policy (these methods handle their own locking)
 	pm.applyPolicy()
@@ -220,7 +220,7 @@ func (pm *PolicyManager) loadConfigFromDir(dir string) (*X00Config, error) {
 	policyPath := filepath.Join(dir, "policy.yaml")
 	if data, err := os.ReadFile(policyPath); err == nil {
 		if err := yaml.Unmarshal(data, &config.Policy); err != nil {
-			log.Printf("⚠️  Failed to parse policy.yaml: %v", err)
+			log.Printf("[WARN] Failed to parse policy.yaml: %v", err)
 		}
 	}
 
@@ -229,7 +229,7 @@ func (pm *PolicyManager) loadConfigFromDir(dir string) (*X00Config, error) {
 	if data, err := os.ReadFile(secretsPath); err == nil {
 		var secretBindings []SecretBinding
 		if err := yaml.Unmarshal(data, &secretBindings); err != nil {
-			log.Printf("⚠️  Failed to parse secrets.yaml: %v", err)
+			log.Printf("[WARN] Failed to parse secrets.yaml: %v", err)
 		} else {
 			config.Secrets = secretBindings
 		}
@@ -239,7 +239,7 @@ func (pm *PolicyManager) loadConfigFromDir(dir string) (*X00Config, error) {
 	monitoringPath := filepath.Join(dir, "monitoring.yaml")
 	if data, err := os.ReadFile(monitoringPath); err == nil {
 		if err := yaml.Unmarshal(data, &config.Monitoring); err != nil {
-			log.Printf("⚠️  Failed to parse monitoring.yaml: %v", err)
+			log.Printf("[WARN] Failed to parse monitoring.yaml: %v", err)
 		}
 	}
 
@@ -258,7 +258,7 @@ func (pm *PolicyManager) applyPolicy() {
 		cb(policy)
 	}
 
-	log.Printf("🔧 Policy applied: mode=%s", mode)
+	log.Printf("[CONFIG] Policy applied: mode=%s", mode)
 }
 
 func (pm *PolicyManager) loadSecrets() {
@@ -272,7 +272,7 @@ func (pm *PolicyManager) loadSecrets() {
 		for _, ref := range binding.SecretRefs {
 			value, err := pm.resolveSecretValue(ref.Source)
 			if err != nil {
-				log.Printf("⚠️  Failed to resolve secret %s: %v", ref.Name, err)
+				log.Printf("[WARN] Failed to resolve secret %s: %v", ref.Name, err)
 				continue
 			}
 
@@ -417,5 +417,5 @@ func boolToUint8(b bool) uint8 {
 
 // ApplyFileProtectionPolicy is a legacy function for backwards compatibility
 func ApplyFileProtectionPolicy() {
-	log.Println("🛡️  [X00] File protection policy initialized (see BPF manager for LSM hooks)")
+	log.Println("[INFO] [X00] File protection policy initialized (see BPF manager for LSM hooks)")
 }

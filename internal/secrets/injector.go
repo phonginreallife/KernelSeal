@@ -60,7 +60,7 @@ func (i *Injector) RegisterSecrets(binaryName string, secrets []Secret) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.secretsByBinary[binaryName] = secrets
-	log.Printf("📝 Registered %d secrets for binary: %s", len(secrets), binaryName)
+	log.Printf("[REGISTER] Registered %d secrets for binary: %s", len(secrets), binaryName)
 }
 
 // RegisterSecretsForCgroup registers secrets for a specific cgroup
@@ -68,7 +68,7 @@ func (i *Injector) RegisterSecretsForCgroup(cgroupID uint64, secrets []Secret) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.secretsByCgroup[cgroupID] = secrets
-	log.Printf("📝 Registered %d secrets for cgroup: %d", len(secrets), cgroupID)
+	log.Printf("[REGISTER] Registered %d secrets for cgroup: %d", len(secrets), cgroupID)
 }
 
 // GetSecretsForProcess returns the secrets that should be injected for a process
@@ -129,7 +129,7 @@ func (i *Injector) InjectSecrets(pid uint32, secrets []Secret) InjectionResult {
 		cb(pid)
 	}
 
-	log.Printf("💉 Injected %d secrets into PID %d", len(secrets), pid)
+	log.Printf("[INJECT] Injected %d secrets into PID %d", len(secrets), pid)
 	return result
 }
 
@@ -246,11 +246,11 @@ func (i *Injector) injectViaSecretFile(pid uint32, fd int) error {
 	uid, gid, uidErr := getProcessUIDGID(pid)
 	if uidErr == nil {
 		if chownErr := os.Chown(secretPath, uid, gid); chownErr != nil {
-			log.Printf("⚠️ Failed to chown secret file: %v", chownErr)
+			log.Printf("[WARN] Failed to chown secret file: %v", chownErr)
 		}
 	}
 
-	log.Printf("📂 Secrets written to %s for PID %d", secretPath, pid)
+	log.Printf("[FILE] Secrets written to %s for PID %d", secretPath, pid)
 	return nil
 }
 
@@ -260,7 +260,7 @@ func (i *Injector) injectViaEnvironFile(pid uint32, secrets []Secret) error {
 	// This function is a placeholder for the fallback mechanism
 	// In practice, we'd need to use ptrace or other techniques
 
-	log.Printf("⚠️  Direct environ injection not available, using file-based secrets for PID %d", pid)
+	log.Printf("[WARN] Direct environ injection not available, using file-based secrets for PID %d", pid)
 
 	// Create a memfd with the secrets
 	fd, err := memfdCreate("x00_secrets")
@@ -290,7 +290,7 @@ func (i *Injector) CleanupSecrets(pid uint32) error {
 	if err := os.Remove(secretPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to cleanup secrets for PID %d: %w", pid, err)
 	}
-	log.Printf("🧹 Cleaned up secrets for PID %d", pid)
+	log.Printf("[CLEANUP] Cleaned up secrets for PID %d", pid)
 	return nil
 }
 
