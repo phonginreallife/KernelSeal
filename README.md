@@ -14,46 +14,6 @@ X00 is a security sidecar that protects application secrets at the kernel level.
 - **No Code Changes**: Applications read secrets from environment variables as usual
 - **Kernel-Side Filtering**: Optional binary filtering in kernel space reduces CPU overhead
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          Kubernetes Node                            │
-│  ┌────────────────────────────────────────────────────────────────┐ │
-│  │                          Pod                                    │ │
-│  │  ┌─────────────────────┐    ┌────────────────────────────────┐ │ │
-│  │  │   Application        │    │         X00 Sidecar            │ │ │
-│  │  │   Container          │    │  ┌─────────────────────────┐  │ │ │
-│  │  │                      │    │  │    BPF Manager          │  │ │ │
-│  │  │  ┌────────────────┐  │    │  │  • Exec Monitor         │  │ │ │
-│  │  │  │  Your App      │  │    │  │  • LSM Hooks            │  │ │ │
-│  │  │  │                │◄─┼────┼──┤  • Event Processing     │  │ │ │
-│  │  │  │  Reads secrets │  │    │  └─────────────────────────┘  │ │ │
-│  │  │  │  from ENV      │  │    │  ┌─────────────────────────┐  │ │ │
-│  │  │  └────────────────┘  │    │  │    Secret Injector      │  │ │ │
-│  │  │                      │    │  │  • Memory injection     │  │ │ │
-│  │  │  NO secrets mounted  │    │  │  • Secret resolution    │  │ │ │
-│  │  │  in filesystem!      │    │  └─────────────────────────┘  │ │ │
-│  │  └─────────────────────┘    │  ┌─────────────────────────┐  │ │ │
-│  │                              │  │    Policy Manager       │  │ │ │
-│  │                              │  │  • Config loading       │  │ │ │
-│  │                              │  │  • Secret bindings      │  │ │ │
-│  │                              │  └─────────────────────────┘  │ │ │
-│  │                              └────────────────────────────────┘ │ │
-│  └────────────────────────────────────────────────────────────────┘ │
-│                                                                     │
-│  ┌────────────────────────────────────────────────────────────────┐ │
-│  │                        Linux Kernel                            │ │
-│  │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐ │ │
-│  │  │ exec_monitor.bpf │  │ lsm_file_protect │  │  Ring Buffer │ │ │
-│  │  │ • sys_enter_     │  │ • LSM: file_open │  │  • Events    │ │ │
-│  │  │   execve         │  │ • LSM: ptrace_   │  │    to user   │ │ │
-│  │  │ • sched_process_ │  │   access_check   │  │    space     │ │ │
-│  │  │   exec (filter)  │  │                  │  │              │ │ │
-│  │  └──────────────────┘  └──────────────────┘  └──────────────┘ │ │
-│  └────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
-```
 
 ## How It Works
 
