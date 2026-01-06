@@ -1,7 +1,7 @@
 # KernelSeal Demo Container
 # Builds KernelSeal with BPF programs for demonstration
 
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -31,7 +31,7 @@ RUN make bpf || echo "BPF build may fail in container, using pre-built objects"
 RUN CGO_ENABLED=0 go build -o kernelseal ./cmd/main.go
 
 # Runtime image
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y \
     libbpf0 \
