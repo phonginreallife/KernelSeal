@@ -51,10 +51,10 @@ type execObjects struct {
 type lsmObjects struct {
 	KernelSealFileOpen          *ebpf.Program `ebpf:"kernelseal_file_open"`
 	KernelSealPtraceAccessCheck *ebpf.Program `ebpf:"kernelseal_ptrace_access_check"`
-	Events               *ebpf.Map     `ebpf:"events"`
+	Events                      *ebpf.Map     `ebpf:"events"`
 	KernelSealAllowedPids       *ebpf.Map     `ebpf:"kernelseal_allowed_pids"`
-	ProtectedPids        *ebpf.Map     `ebpf:"protected_pids"`
-	PolicyConfig         *ebpf.Map     `ebpf:"policy_config"`
+	ProtectedPids               *ebpf.Map     `ebpf:"protected_pids"`
+	PolicyConfig                *ebpf.Map     `ebpf:"policy_config"`
 }
 
 // NewManager creates a new BPF manager
