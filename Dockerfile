@@ -24,7 +24,7 @@ COPY Makefile ./
 RUN make bpf || echo "BPF build skipped - will use pre-built objects"
 
 # Stage 2: Build Go binary
-FROM golang:1.22-alpine AS go-builder
+FROM golang:1.25-alpine AS go-builder
 WORKDIR /app
 
 # Install build dependencies
