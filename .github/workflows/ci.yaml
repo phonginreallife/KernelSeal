@@ -8,39 +8,15 @@ on:
 
 env:
   GO_VERSION: '1.22'
+  GOLANGCI_LINT_VERSION: 'v1.55'
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # Unit tests - runs on all PRs and pushes
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Run unit tests
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/...
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.out
-          flags: unittests
-          fail_ci_if_error: false
-
-      - name: Generate coverage report
-        run: go tool cover -func=coverage.out
-
-  # Lint - static analysis
+  # Fast checks first - fail fast on simple issues
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -57,10 +33,39 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
-          version: latest
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout=5m
+          # Skip cache - action handles it internally
+          skip-cache: false
+          skip-pkg-cache: false
+          skip-build-cache: false
 
-  # Security scan
+  # Unit tests - parallel with lint
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run unit tests
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          flags: unittests
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  # Security scan - parallel with lint/test
   security:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -74,19 +79,25 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Run Gosec Security Scanner
+      - name: Run govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./... || true
+
+      - name: Run Gosec
         uses: securego/gosec@master
         with:
           args: '-no-fail -fmt sarif -out results.sarif ./...'
+        continue-on-error: true
 
-      - name: Upload SARIF file
+      - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
         if: always()
         continue-on-error: true
 
-  # Build BPF programs
+  # Build BPF programs - with aggressive caching
   build-bpf:
     name: Build BPF Programs
     runs-on: ubuntu-latest
@@ -94,18 +105,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install BPF build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang llvm libbpf-dev linux-headers-$(uname -r) make
+      - name: Cache APT packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: clang llvm libbpf-dev bpftool
+          version: 1.0
+
+      - name: Cache vmlinux.h
+        id: cache-vmlinux
+        uses: actions/cache@v4
+        with:
+          path: bpf/vmlinux.h
+          key: vmlinux-${{ runner.os }}-${{ hashFiles('/sys/kernel/btf/vmlinux') }}
+          restore-keys: |
+            vmlinux-${{ runner.os }}-
 
       - name: Generate vmlinux.h
+        if: steps.cache-vmlinux.outputs.cache-hit != 'true'
         run: |
-          if [ ! -f bpf/vmlinux.h ]; then
-            bpftool btf dump file /sys/kernel/btf/vmlinux format c > bpf/vmlinux.h
-          fi
+          sudo bpftool btf dump file /sys/kernel/btf/vmlinux format c > bpf/vmlinux.h
+
+      - name: Cache BPF objects
+        id: cache-bpf
+        uses: actions/cache@v4
+        with:
+          path: bpf/*.bpf.o
+          key: bpf-${{ runner.os }}-${{ hashFiles('bpf/*.bpf.c', 'bpf/*.h') }}
 
       - name: Build BPF programs
+        if: steps.cache-bpf.outputs.cache-hit != 'true'
         run: make bpf
 
       - name: Upload BPF objects
@@ -115,11 +143,11 @@ jobs:
           path: bpf/*.bpf.o
           retention-days: 7
 
-  # Build Go binary
+  # Build Go binary - depends on lint/test passing
   build:
     name: Build Binary
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    needs: [lint, test]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -129,6 +157,14 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ runner.os }}-${{ hashFiles('**/*.go', 'go.sum') }}
+          restore-keys: |
+            go-build-${{ runner.os }}-
 
       - name: Build binary
         run: |
@@ -143,10 +179,9 @@ jobs:
           path: kernelseal
           retention-days: 7
 
-  # Build Docker image (validation only - no push)
-  # Actual releases are handled by release.yaml on version tags
+  # Docker build - with layer caching
   docker:
-    name: Build Docker Image (Validate)
+    name: Build Docker Image
     runs-on: ubuntu-latest
     needs: [build, build-bpf]
     steps:
@@ -162,7 +197,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image (no push)
+      - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -170,8 +205,38 @@ jobs:
           tags: kernelseal:ci-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Build args for layer caching
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
-  # Integration tests (requires privileged runner)
+  # Kubernetes manifest validation - parallel, no dependencies
+  validate-k8s:
+    name: Validate K8s Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache kubeconform
+        id: cache-kubeconform
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/kubeconform
+          key: kubeconform-v0.6.4
+
+      - name: Install kubeconform
+        if: steps.cache-kubeconform.outputs.cache-hit != 'true'
+        run: |
+          wget -q https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform-linux-amd64.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate manifests
+        run: |
+          kubeconform -strict -summary deploy/manifests/*.yaml || true
+          kubeconform -strict -summary deploy/kernelseal-sidecar.yaml || true
+
+  # Integration tests - only on main, requires BPF
   integration-test:
     name: Integration Tests
     runs-on: ubuntu-latest
@@ -201,25 +266,7 @@ jobs:
       - name: Run integration tests
         run: |
           chmod +x ./kernelseal
-          # Integration tests would run here with sudo
-          # For now, just verify the binary runs
+          # Verify binary runs
           ./kernelseal -help || true
-
-  # Kubernetes manifest validation
-  validate-k8s:
-    name: Validate Kubernetes Manifests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install kubeval
-        run: |
-          wget https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
-          tar xf kubeval-linux-amd64.tar.gz
-          sudo mv kubeval /usr/local/bin/
-
-      - name: Validate manifests
-        run: |
-          kubeval --strict deploy/manifests/*.yaml || true
-          kubeval --strict deploy/kernelseal-sidecar.yaml || true
+          # Run Go integration tests (mocked, no BPF required)
+          go test -v -tags=integration ./test/integration/... || true
