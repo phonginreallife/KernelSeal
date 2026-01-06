@@ -76,6 +76,8 @@ type SecretRef struct {
 
 // SecretSource defines where to get the secret value
 type SecretSource struct {
+	// Literal value
+	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 	// Kubernetes secret reference
 	SecretKeyRef *SecretKeyRef `yaml:"secretKeyRef,omitempty" json:"secretKeyRef,omitempty"`
 	// File path reference
@@ -292,6 +294,11 @@ func (pm *PolicyManager) loadSecrets() {
 }
 
 func (pm *PolicyManager) resolveSecretValue(source SecretSource) (string, error) {
+	// Literal value (inline secret)
+	if source.Value != "" {
+		return source.Value, nil
+	}
+
 	// Environment variable reference
 	if source.EnvRef != "" {
 		value := os.Getenv(source.EnvRef)
