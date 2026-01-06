@@ -1,4 +1,4 @@
-# KernelSeal Example Configuration
+# KernelSeal Configuration
 # Copy this file to /etc/kernelseal/config.yaml and customize
 
 version: v1
@@ -37,59 +37,117 @@ policy:
   kernelBinaryFilter: true
 
 secrets:
-  # Example: Inject database credentials into PostgreSQL client
-  - name: postgres-secrets
+  # ------------------------------------------------------
+  # WORKING: Environment variable source (envRef)
+  # ------------------------------------------------------
+  
+  # Example: Inject secrets into sleep command (for testing)
+  - name: test-secrets
     selector:
-      binary: "psql"
+      binary: "sleep"
     secretRefs:
-      - name: PGPASSWORD
+      - name: MY_SECRET
         source:
-          # Read from Kubernetes secret mount
-          secretKeyRef:
-            name: postgres-credentials
-            key: password
-      - name: PGUSER
+          envRef: MY_SECRET_VALUE        # Reads from $MY_SECRET_VALUE env var
+      - name: DB_PASSWORD
         source:
-          secretKeyRef:
-            name: postgres-credentials
-            key: username
+          envRef: DB_PASSWORD_VALUE      # Reads from $DB_PASSWORD_VALUE env var
 
-  # Example: Inject API keys into a web application
-  - name: webapp-secrets
-    selector:
-      binary: "node"
-      # Or match by container name:
-      # container: "webapp"
-    secretRefs:
-      - name: API_SECRET_KEY
-        source:
-          secretKeyRef:
-            name: webapp-api-keys
-            key: secret-key
-      - name: STRIPE_API_KEY
-        source:
-          secretKeyRef:
-            name: stripe-credentials
-            key: api-key
-      - name: JWT_SECRET
-        source:
-          # Read from a file (e.g., for Vault agent sidecar integration)
-          fileRef: "/vault/secrets/jwt-secret"
-
-  # Example: Inject AWS credentials
+  # Example: Inject AWS credentials into AWS CLI
   - name: aws-secrets
     selector:
       binary: "aws"
     secretRefs:
       - name: AWS_ACCESS_KEY_ID
         source:
-          envRef: "KernelSeal_AWS_ACCESS_KEY_ID"
+          envRef: AWS_ACCESS_KEY_ID_VALUE
       - name: AWS_SECRET_ACCESS_KEY
         source:
-          envRef: "KernelSeal_AWS_SECRET_ACCESS_KEY"
+          envRef: AWS_SECRET_ACCESS_KEY_VALUE
+
+  # ------------------------------------------------------
+  # WORKING: File source (fileRef)
+  # ------------------------------------------------------
+  
+  # Example: Read secrets from files (Vault agent sidecar integration)
+  - name: webapp-secrets
+    selector:
+      binary: "node"
+    secretRefs:
+      - name: JWT_SECRET
+        source:
+          fileRef: "/vault/secrets/jwt-secret"
+      - name: API_KEY
+        source:
+          fileRef: "/run/secrets/api-key"
+
+  # ------------------------------------------------------
+  # PLANNED: Kubernetes secret source (secretKeyRef)
+  # Requires Kubernetes API access - not yet implemented
+  # ------------------------------------------------------
+  
+  # - name: postgres-secrets
+  #   selector:
+  #     binary: "psql"
+  #   secretRefs:
+  #     - name: PGPASSWORD
+  #       source:
+  #         secretKeyRef:
+  #           name: postgres-credentials
+  #           namespace: default
+  #           key: password
+
+  # ------------------------------------------------------
+  # PLANNED: HashiCorp Vault source (vaultRef)
+  # Requires Vault integration - not yet implemented
+  # ------------------------------------------------------
+  
+  # - name: vault-secrets
+  #   selector:
+  #     binary: "myapp"
+  #   secretRefs:
+  #     - name: DB_PASSWORD
+  #       source:
+  #         vaultRef:
+  #           path: "secret/data/myapp/db"
+  #           key: "password"
 
 monitoring:
   enabled: true
   metricsPort: 9090
   logLevel: info  # debug, info, warn, error
   auditLog: /var/log/kernelseal/audit.log
+
+# ------------------------------------------------------
+# Quick Start Example
+# ------------------------------------------------------
+# 
+# 1. Create config with environment variable secrets:
+#
+#    cat > /etc/kernelseal/config.yaml << 'EOF'
+#    version: v1
+#    policy:
+#      mode: enforce
+#      blockEnviron: true
+#      blockMem: true
+#      blockPtrace: true
+#      kernelBinaryFilter: true
+#    secrets:
+#      - name: test
+#        selector:
+#          binary: "sleep"
+#        secretRefs:
+#          - name: SECRET_KEY
+#            source:
+#              envRef: SECRET_KEY_VALUE
+#    EOF
+#
+# 2. Run KernelSeal with the secret value:
+#
+#    export SECRET_KEY_VALUE="my-secret-123"
+#    kernelseal -config /etc/kernelseal/config.yaml
+#
+# 3. Test protection:
+#
+#    sleep 300 &
+#    cat /proc/$!/environ  # Should be blocked!
