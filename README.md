@@ -1,8 +1,8 @@
-# X00
+# KernelSeal
 
 **Kernel-level Secret Protection for Kubernetes using eBPF and BPF-LSM**
 
-X00 is a security sidecar that protects application secrets at the kernel level. Unlike traditional secret management that mounts secrets into container filesystems, X00 injects secrets directly into process memory at runtime and uses BPF-LSM to prevent unauthorized access—even from root users inside the container.
+KernelSeal is a security sidecar that protects application secrets at the kernel level. Unlike traditional secret management that mounts secrets into container filesystems, KernelSeal injects secrets directly into process memory at runtime and uses BPF-LSM to prevent unauthorized access, even from root users inside the container.
 
 ## Key Features
 
@@ -21,7 +21,7 @@ X00 is a security sidecar that protects application secrets at the kernel level.
 When a new process starts, the eBPF tracepoint attached to `sys_enter_execve` (or `sched_process_exec` when kernel filtering is enabled) captures the event and sends it to user space via ring buffer.
 
 ### 2. Secret Injection
-X00 checks if the process matches any configured secret bindings (by binary name). If so, it injects the secrets into the process, making them available via file-based secret delivery.
+KernelSeal checks if the process matches any configured secret bindings (by binary name). If so, it injects the secrets into the process, making them available via file-based secret delivery.
 
 ### 3. Kernel Protection
 BPF-LSM hooks prevent any process (including root) from:
@@ -30,7 +30,7 @@ BPF-LSM hooks prevent any process (including root) from:
 - Attaching ptrace to protected processes
 
 ### 4. Policy Enforcement
-X00 supports three enforcement modes:
+KernelSeal supports three enforcement modes:
 - **Disabled**: No protection, useful for debugging
 - **Audit**: Log access attempts but don't block
 - **Enforce**: Block and log unauthorized access
@@ -66,10 +66,10 @@ ls /sys/kernel/btf/vmlinux
 
 ```bash
 # Pull the image
-docker pull ghcr.io/phonginreallife/x00:latest
+docker pull ghcr.io/phonginreallife/kernelseal:latest
 
 # Create a config file
-cat > /tmp/x00-config.yaml << 'EOF'
+cat > /tmp/kernelseal-config.yaml << 'EOF'
 version: v1
 policy:
   mode: enforce
@@ -86,28 +86,28 @@ secrets:
     secretRefs:
       - name: MY_SECRET
         source:
-          envRef: "X00_MY_SECRET"
+          envRef: "KernelSeal_MY_SECRET"
 EOF
 
-# Run X00
-docker run -d --name x00 \
+# Run KernelSeal
+docker run -d --name kernelseal \
   --privileged \
   --pid=host \
   -v /sys/kernel/security:/sys/kernel/security:ro \
-  -v /tmp/x00-config.yaml:/etc/x00/config.yaml:ro \
-  -e X00_MY_SECRET="secret-value-here" \
-  ghcr.io/phonginreallife/x00:latest
+  -v /tmp/kernelseal-config.yaml:/etc/kernelseal/config.yaml:ro \
+  -e KernelSeal_MY_SECRET="secret-value-here" \
+  ghcr.io/phonginreallife/kernelseal:latest
 
 # View logs
-docker logs -f x00
+docker logs -f kernelseal
 ```
 
 ### Option 2: Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/phonginreallife/x00.git
-cd x00
+git clone https://github.com/phonginreallife/kernelseal.git
+cd kernelseal
 
 # Build using Docker (recommended)
 make docker-build
@@ -116,7 +116,7 @@ make docker-build
 make all
 
 # Run locally (requires root)
-sudo ./build/x00 -config examples/config.yaml
+sudo ./build/kernelseal -config examples/config.yaml
 ```
 
 ### Option 3: Deploy to Kubernetes
@@ -132,7 +132,7 @@ kubectl apply -f deploy/manifests/configmap.yaml
 kubectl apply -f deploy/manifests/daemonset.yaml
 ```
 
-### Deploy Your Application with X00 Sidecar
+### Deploy Your Application with KernelSeal Sidecar
 
 ```yaml
 apiVersion: v1
@@ -145,22 +145,22 @@ spec:
   - name: myapp
     image: myapp:latest
     # No secret mounts needed!
-  - name: x00
-    image: ghcr.io/phonginreallife/x00:latest
+  - name: kernelseal
+    image: ghcr.io/phonginreallife/kernelseal:latest
     securityContext:
       privileged: true
       capabilities:
         add: [SYS_ADMIN, BPF, SYS_PTRACE, PERFMON]
     volumeMounts:
-    - name: x00-config
-      mountPath: /etc/x00
+    - name: kernelseal-config
+      mountPath: /etc/kernelseal
     - name: kernel-security
       mountPath: /sys/kernel/security
       readOnly: true
   volumes:
-  - name: x00-config
+  - name: kernelseal-config
     configMap:
-      name: x00-config
+      name: kernelseal-config
   - name: kernel-security
     hostPath:
       path: /sys/kernel/security
@@ -168,7 +168,7 @@ spec:
 
 ## Configuration
 
-X00 is configured via YAML file (`/etc/x00/config.yaml`):
+KernelSeal is configured via YAML file (`/etc/kernelseal/config.yaml`):
 
 ```yaml
 version: v1
@@ -202,7 +202,7 @@ monitoring:
 
 ### Kernel-Side Binary Filtering
 
-When `kernelBinaryFilter: true`, X00 only processes exec events for binaries listed in your `secrets` configuration. This significantly reduces CPU overhead on busy systems.
+When `kernelBinaryFilter: true`, KernelSeal only processes exec events for binaries listed in your `secrets` configuration. This significantly reduces CPU overhead on busy systems.
 
 | Setting | Behavior | Use Case |
 |---------|----------|----------|
@@ -211,7 +211,7 @@ When `kernelBinaryFilter: true`, X00 only processes exec events for binaries lis
 
 ### Secret Sources
 
-X00 supports multiple secret sources:
+KernelSeal supports multiple secret sources:
 
 ```yaml
 secretRefs:
@@ -227,7 +227,7 @@ secretRefs:
     source:
       fileRef: "/vault/secrets/api-key"
   
-  # From environment variable (X00's own environment)
+  # From environment variable (KernelSeal's own environment)
   - name: TOKEN
     source:
       envRef: "SOURCE_TOKEN"
@@ -238,19 +238,19 @@ secretRefs:
 ### Logs
 
 ```bash
-# View X00 logs
-kubectl logs -n x00-system -l app.kubernetes.io/name=x00 -f
+# View KernelSeal logs
+kubectl logs -n kernelseal-system -l app.kubernetes.io/name=kernelseal -f
 
 # Or with Docker
-docker logs -f x00
+docker logs -f kernelseal
 ```
 
 Example output:
 ```
-[START] Starting X00 Sidecar - Secret Protection System
+[START] Starting KernelSeal Sidecar - Secret Protection System
    Version: 0.1.0
-   Config: /etc/x00/config.yaml
-[CONFIG] Loaded X00 configuration from /etc/x00/config.yaml
+   Config: /etc/kernelseal/config.yaml
+[CONFIG] Loaded KernelSeal configuration from /etc/kernelseal/config.yaml
 [CONFIG] Policy applied: mode=enforce
 [REGISTER] Registered 2 secrets for binary: sleep
 [OK] Exec monitor BPF programs loaded and attached
@@ -258,10 +258,10 @@ Example output:
 [OK] LSM BPF programs loaded and attached
 [ALLOW] PID 1234 added to allowed list
 [CONFIG] Policy configured: mode=enforce, environ=true, mem=true, ptrace=true
-[OK] X00 Sidecar running - monitoring for process execution
+[OK] KernelSeal Sidecar running - monitoring for process execution
 
 [EXEC] PID=5678 PPID=1234 Comm=sleep File=/usr/bin/sleep Binary=sleep CgroupID=7194
-[FILE] Secrets written to /run/x00/secrets/5678 for PID 5678
+[FILE] Secrets written to /run/kernelseal/secrets/5678 for PID 5678
 [PROTECT] PID 5678 marked as protected
 [INJECT] Secrets injected into PID 5678: [MY_SECRET]
 
@@ -270,12 +270,12 @@ Example output:
 
 ### Metrics (Prometheus)
 
-X00 exposes metrics on `:9090/metrics`:
+KernelSeal exposes metrics on `:9090/metrics`:
 
-- `x00_exec_events_total` - Total exec events processed
-- `x00_secrets_injected_total` - Total secrets injected
-- `x00_access_blocked_total` - Total blocked access attempts
-- `x00_access_audit_total` - Total audited access attempts
+- `kernelseal_exec_events_total` - Total exec events processed
+- `kernelseal_secrets_injected_total` - Total secrets injected
+- `kernelseal_access_blocked_total` - Total blocked access attempts
+- `kernelseal_access_audit_total` - Total audited access attempts
 
 ## Testing
 
@@ -306,7 +306,7 @@ make test
 ### Project Structure
 
 ```
-x00/
+kernelseal/
 ├── .github/                # CI/CD workflows
 │   ├── workflows/
 │   │   ├── ci.yaml         # Build and test
@@ -316,7 +316,7 @@ x00/
 │   ├── exec_monitor.bpf.c  # Process execution monitor
 │   ├── lsm_file_protect.bpf.c  # LSM hooks for file protection
 │   ├── vmlinux.h           # Kernel type definitions
-│   └── x00_common.h        # Shared types
+│   └── kernelseal_common.h        # Shared types
 ├── cmd/
 │   └── main.go             # Entry point
 ├── internal/
@@ -329,7 +329,7 @@ x00/
 │   └── policy.go           # Policy management
 ├── deploy/                 # Kubernetes manifests
 │   ├── manifests/
-│   └── x00-sidecar.yaml
+│   └── kernelseal-sidecar.yaml
 ├── demo/                   # Demo scripts
 ├── examples/               # Example configurations
 │   └── config.yaml
@@ -358,7 +358,7 @@ make bpf
 make build
 
 # Run locally (requires root)
-sudo ./build/x00 -config examples/config.yaml
+sudo ./build/kernelseal -config examples/config.yaml
 ```
 
 ### Building Docker Image
@@ -368,17 +368,17 @@ sudo ./build/x00 -config examples/config.yaml
 make docker-build
 
 # Tag and push (CI does this automatically on release)
-docker tag x00:latest ghcr.io/yourorg/x00:v1.0.0
-docker push ghcr.io/yourorg/x00:v1.0.0
+docker tag kernelseal:latest ghcr.io/yourorg/kernelseal:v1.0.0
+docker push ghcr.io/yourorg/kernelseal:v1.0.0
 ```
 
 ## Security Considerations
 
-1. **Privileged Container**: X00 requires privileged access to load BPF programs
+1. **Privileged Container**: KernelSeal requires privileged access to load BPF programs
 2. **Shared Process Namespace**: Pods must set `shareProcessNamespace: true`
 3. **Kernel Requirements**: BPF-LSM must be enabled in the kernel
-4. **Trust Model**: X00 sidecar is trusted; ensure image integrity
-5. **Secret Storage**: X00 reads secrets from its own environment or mounted files; protect these sources
+4. **Trust Model**: KernelSeal sidecar is trusted; ensure image integrity
+5. **Secret Storage**: KernelSeal reads secrets from its own environment or mounted files; protect these sources
 
 ### Security Scanning
 
@@ -389,13 +389,6 @@ The CI pipeline includes:
 - **Hadolint**: Dockerfile linting
 - **Gitleaks**: Secret detection in code
 
-## CI/CD
-
-Releases are automated via GitHub Actions:
-
-1. Push a tag: `git tag v1.0.0 && git push origin v1.0.0`
-2. CI builds and pushes Docker image to `ghcr.io/phonginreallife/x00:v1.0.0`
-3. Image is also tagged as `latest`
 
 ## License
 

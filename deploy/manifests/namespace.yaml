@@ -1,27 +1,27 @@
-# X00 Namespace and core resources
+# KernelSeal Namespace and core resources
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: x00-system
+  name: kernelseal-system
   labels:
-    app.kubernetes.io/name: x00
+    app.kubernetes.io/name: kernelseal
     app.kubernetes.io/component: security
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: x00-controller
-  namespace: x00-system
+  name: kernelseal-controller
+  namespace: kernelseal-system
   labels:
-    app.kubernetes.io/name: x00
+    app.kubernetes.io/name: kernelseal
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: x00-controller
+  name: kernelseal-controller
   labels:
-    app.kubernetes.io/name: x00
+    app.kubernetes.io/name: kernelseal
 rules:
 # Core API access for pods and secrets
 - apiGroups: [""]
@@ -45,14 +45,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: x00-controller
+  name: kernelseal-controller
   labels:
-    app.kubernetes.io/name: x00
+    app.kubernetes.io/name: kernelseal
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: x00-controller
+  name: kernelseal-controller
 subjects:
 - kind: ServiceAccount
-  name: x00-controller
-  namespace: x00-system
+  name: kernelseal-controller
+  namespace: kernelseal-system

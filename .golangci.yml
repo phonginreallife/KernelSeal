@@ -1,4 +1,4 @@
-# golangci-lint configuration for X00
+# golangci-lint configuration for KernelSeal
 
 run:
   timeout: 5m
@@ -40,7 +40,7 @@ linters-settings:
     simplify: true
 
   goimports:
-    local-prefixes: x00
+    local-prefixes: kernelseal
 
   misspell:
     locale: US

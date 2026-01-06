@@ -1,7 +1,7 @@
 # Gitleaks configuration for secret detection
 # https://github.com/gitleaks/gitleaks
 
-title = "X00 Gitleaks Configuration"
+title = "KernelSeal Gitleaks Configuration"
 
 [extend]
 # Use the default gitleaks rules as a base
@@ -9,16 +9,16 @@ useDefault = true
 
 # Custom rules for this project
 [[rules]]
-id = "x00-api-key"
-description = "X00 API Key"
-regex = '''X00[_-]?API[_-]?KEY\s*[=:]\s*["']?[A-Za-z0-9_-]{16,}["']?'''
-tags = ["x00", "api-key"]
+id = "kernelseal-api-key"
+description = "KernelSeal API Key"
+regex = '''KernelSeal[_-]?API[_-]?KEY\s*[=:]\s*["']?[A-Za-z0-9_-]{16,}["']?'''
+tags = ["kernelseal", "api-key"]
 
 [[rules]]
-id = "x00-db-password"
-description = "X00 Database Password"
-regex = '''X00[_-]?DB[_-]?PASSWORD\s*[=:]\s*["']?[A-Za-z0-9!@#$%^&*()_+-=]{8,}["']?'''
-tags = ["x00", "database", "password"]
+id = "kernelseal-db-password"
+description = "KernelSeal Database Password"
+regex = '''KernelSeal[_-]?DB[_-]?PASSWORD\s*[=:]\s*["']?[A-Za-z0-9!@#$%^&*()_+-=]{8,}["']?'''
+tags = ["kernelseal", "database", "password"]
 
 [[rules]]
 id = "vault-token"
@@ -52,17 +52,26 @@ paths = [
 # Commits to ignore (if any known false positives)
 commits = []
 
-# Specific regex patterns to ignore
+# Specific regex patterns to ignore (placeholders and demo values)
 regexes = [
   # Demo/example placeholder values
-  '''demo-.*-\d+''',
-  '''my-secret-value''',
-  '''super-secret-password''',
-  '''placeholder''',
-  '''example''',
+  '''demo-.*''',
+  '''docker-demo-.*''',
+  '''placeholder.*''',
+  '''my-secret.*''',
+  '''secret-value.*''',
+  '''file-secret.*''',
+  '''super-secret.*''',
+  '''example.*''',
   '''changeme''',
   '''CHANGEME''',
   # Test values
   '''test.*password''',
   '''test.*secret''',
+  # Generic placeholders
+  '''.*-here$''',
+  # False positives - Go struct field access patterns
+  '''s\.KernelSeal.*''',
+  '''Objs\.KernelSeal.*''',
+  '''lsmObjs\..*''',
 ]

@@ -1,18 +1,18 @@
-# X00 DaemonSet - Run X00 on every node (alternative to sidecar pattern)
+# KernelSeal DaemonSet - Run KernelSeal on every node (alternative to sidecar pattern)
 # Use this when you want node-wide secret protection
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: x00
-  namespace: x00-system
+  name: kernelseal
+  namespace: kernelseal-system
   labels:
-    app.kubernetes.io/name: x00
+    app.kubernetes.io/name: kernelseal
     app.kubernetes.io/component: security-agent
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: x00
+      app.kubernetes.io/name: kernelseal
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -20,13 +20,13 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: x00
+        app.kubernetes.io/name: kernelseal
         app.kubernetes.io/component: security-agent
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
     spec:
-      serviceAccountName: x00-controller
+      serviceAccountName: kernelseal-controller
       hostPID: true          # Required to monitor all processes
       hostNetwork: false     # Not needed
       
@@ -40,11 +40,11 @@ spec:
       priorityClassName: system-node-critical
       
       containers:
-      - name: x00
-        image: your-registry/x00:latest
+      - name: kernelseal
+        image: your-registry/kernelseal:latest
         imagePullPolicy: Always
         args:
-          - "-config=/etc/x00/config.yaml"
+          - "-config=/etc/kernelseal/config.yaml"
         
         securityContext:
           privileged: true
@@ -85,10 +85,10 @@ spec:
         
         volumeMounts:
         - name: config
-          mountPath: /etc/x00
+          mountPath: /etc/kernelseal
           readOnly: true
         - name: secrets-runtime
-          mountPath: /run/x00/secrets
+          mountPath: /run/kernelseal/secrets
         - name: sys-kernel-debug
           mountPath: /sys/kernel/debug
           readOnly: true
@@ -121,10 +121,10 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: x00-config
+          name: kernelseal-config
       - name: secrets-runtime
         hostPath:
-          path: /run/x00/secrets
+          path: /run/kernelseal/secrets
           type: DirectoryOrCreate
       - name: sys-kernel-debug
         hostPath:
@@ -150,13 +150,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: x00-metrics
-  namespace: x00-system
+  name: kernelseal-metrics
+  namespace: kernelseal-system
   labels:
-    app.kubernetes.io/name: x00
+    app.kubernetes.io/name: kernelseal
 spec:
   selector:
-    app.kubernetes.io/name: x00
+    app.kubernetes.io/name: kernelseal
   ports:
   - name: metrics
     port: 9090

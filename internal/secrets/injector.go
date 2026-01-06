@@ -173,7 +173,7 @@ func (i *Injector) injectViaProcessMemory(pid uint32, secrets []Secret) error {
 // This creates a memfd with the secrets and passes it to the target process
 func (i *Injector) injectViaFdPass(pid uint32, secrets []Secret) error {
 	// Create memfd for secrets
-	fd, err := memfdCreate("x00_secrets")
+	fd, err := memfdCreate("kernelseal_secrets")
 	if err != nil {
 		return fmt.Errorf("memfd_create failed: %w", err)
 	}
@@ -223,10 +223,10 @@ func (i *Injector) injectFdViaPidfd(pid uint32, fd int) error {
 // injectViaSecretFile creates a process-specific secret file
 func (i *Injector) injectViaSecretFile(pid uint32, fd int) error {
 	// Create process-specific secret file
-	secretPath := fmt.Sprintf("/run/x00/secrets/%d", pid)
+	secretPath := fmt.Sprintf("/run/kernelseal/secrets/%d", pid)
 
 	// Ensure directory exists
-	if err := os.MkdirAll("/run/x00/secrets", 0700); err != nil {
+	if err := os.MkdirAll("/run/kernelseal/secrets", 0700); err != nil {
 		return fmt.Errorf("failed to create secrets dir: %w", err)
 	}
 
@@ -263,7 +263,7 @@ func (i *Injector) injectViaEnvironFile(pid uint32, secrets []Secret) error {
 	log.Printf("[WARN] Direct environ injection not available, using file-based secrets for PID %d", pid)
 
 	// Create a memfd with the secrets
-	fd, err := memfdCreate("x00_secrets")
+	fd, err := memfdCreate("kernelseal_secrets")
 	if err != nil {
 		return err
 	}
@@ -286,7 +286,7 @@ func (i *Injector) injectViaEnvironFile(pid uint32, secrets []Secret) error {
 
 // CleanupSecrets removes the secret file for a process
 func (i *Injector) CleanupSecrets(pid uint32) error {
-	secretPath := fmt.Sprintf("/run/x00/secrets/%d", pid)
+	secretPath := fmt.Sprintf("/run/kernelseal/secrets/%d", pid)
 	if err := os.Remove(secretPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to cleanup secrets for PID %d: %w", pid, err)
 	}

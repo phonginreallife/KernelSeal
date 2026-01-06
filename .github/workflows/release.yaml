@@ -55,20 +55,20 @@ jobs:
           # Linux AMD64
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
             -ldflags="-w -s -X main.Version=${{ github.ref_name }}" \
-            -o dist/x00-linux-amd64 ./cmd/main.go
+            -o dist/kernelseal-linux-amd64 ./cmd/main.go
           
           # Linux ARM64
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
             -ldflags="-w -s -X main.Version=${{ github.ref_name }}" \
-            -o dist/x00-linux-arm64 ./cmd/main.go
+            -o dist/kernelseal-linux-arm64 ./cmd/main.go
           
           # Create tarball with BPF objects
-          tar -czvf dist/x00-${{ github.ref_name }}-linux-amd64.tar.gz \
-            -C dist x00-linux-amd64 \
+          tar -czvf dist/kernelseal-${{ github.ref_name }}-linux-amd64.tar.gz \
+            -C dist kernelseal-linux-amd64 \
             -C ${{ github.workspace }} bpf/*.bpf.o
           
-          tar -czvf dist/x00-${{ github.ref_name }}-linux-arm64.tar.gz \
-            -C dist x00-linux-arm64 \
+          tar -czvf dist/kernelseal-${{ github.ref_name }}-linux-arm64.tar.gz \
+            -C dist kernelseal-linux-arm64 \
             -C ${{ github.workspace }} bpf/*.bpf.o
 
       - name: Generate checksums

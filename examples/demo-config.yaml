@@ -1,4 +1,4 @@
-# X00 Demo Configuration
+# KernelSeal Demo Configuration
 # This config injects secrets into common commands for testing
 
 version: v1
@@ -20,10 +20,10 @@ secrets:
     secretRefs:
       - name: DEMO_API_KEY
         source:
-          envRef: "X00_DEMO_API_KEY"
+          envRef: "KernelSeal_DEMO_API_KEY"
       - name: DEMO_DB_PASSWORD  
         source:
-          envRef: "X00_DEMO_DB_PASSWORD"
+          envRef: "KernelSeal_DEMO_DB_PASSWORD"
 
   # Inject secrets into 'sleep' command (for testing)
   - name: sleep-demo
@@ -32,7 +32,7 @@ secrets:
     secretRefs:
       - name: DEMO_SECRET
         source:
-          envRef: "X00_DEMO_SECRET"
+          envRef: "KernelSeal_DEMO_SECRET"
 
   # Inject secrets into Python processes
   - name: python-demo
@@ -41,10 +41,10 @@ secrets:
     secretRefs:
       - name: PYTHON_API_KEY
         source:
-          envRef: "X00_PYTHON_API_KEY"
+          envRef: "KernelSeal_PYTHON_API_KEY"
 
 monitoring:
   enabled: true
   metricsPort: 9090
   logLevel: debug
-  auditLog: /tmp/x00-audit.log
+  auditLog: /tmp/kernelseal-audit.log

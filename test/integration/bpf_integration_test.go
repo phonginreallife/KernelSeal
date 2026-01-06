@@ -1,4 +1,4 @@
-// Package integration contains integration and system tests for X00
+// Package integration contains integration and system tests for KernelSeal
 // These tests require root privileges and a kernel with BPF-LSM support
 package integration
 
@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"x00/internal/bpf"
-	"x00/internal/types"
+	"kernelseal/internal/bpf"
+	"kernelseal/internal/types"
 )
 
 // TestBPF_FullWorkflow tests the complete BPF workflow

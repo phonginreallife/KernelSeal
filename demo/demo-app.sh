@@ -1,14 +1,14 @@
 #!/bin/bash
 # Demo Application
-# This script demonstrates X00's secret injection
+# This script demonstrates KernelSeal's secret injection
 
 echo "=========================================="
-echo "  X00 Demo Application"
+echo "  KernelSeal Demo Application"
 echo "=========================================="
 echo ""
 echo "This application will:"
-echo "  1. Run various commands that X00 monitors"
-echo "  2. Show injected secrets (if X00 is working)"
+echo "  1. Run various commands that KernelSeal monitors"
+echo "  2. Show injected secrets (if KernelSeal is working)"
 echo ""
 echo "Starting demo loop..."
 echo ""

@@ -134,13 +134,13 @@ jobs:
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
             -ldflags="-w -s -X main.Version=${{ github.sha }}" \
-            -o x00 ./cmd/main.go
+            -o kernelseal ./cmd/main.go
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: x00-binary
-          path: x00
+          name: kernelseal-binary
+          path: kernelseal
           retention-days: 7
 
   # Build Docker image (validation only - no push)
@@ -167,7 +167,7 @@ jobs:
         with:
           context: .
           push: false
-          tags: x00:ci-test
+          tags: kernelseal:ci-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -196,14 +196,14 @@ jobs:
       - name: Download binary
         uses: actions/download-artifact@v4
         with:
-          name: x00-binary
+          name: kernelseal-binary
 
       - name: Run integration tests
         run: |
-          chmod +x ./x00
+          chmod +x ./kernelseal
           # Integration tests would run here with sudo
           # For now, just verify the binary runs
-          ./x00 -help || true
+          ./kernelseal -help || true
 
   # Kubernetes manifest validation
   validate-k8s:
@@ -222,4 +222,4 @@ jobs:
       - name: Validate manifests
         run: |
           kubeval --strict deploy/manifests/*.yaml || true
-          kubeval --strict deploy/x00-sidecar.yaml || true
+          kubeval --strict deploy/kernelseal-sidecar.yaml || true

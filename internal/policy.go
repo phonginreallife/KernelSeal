@@ -1,4 +1,4 @@
-// Package internal provides core X00 functionality
+// Package internal provides core KernelSeal functionality
 package internal
 
 import (
@@ -13,13 +13,13 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"x00/internal/secrets"
-	"x00/internal/types"
+	"kernelseal/internal/secrets"
+	"kernelseal/internal/types"
 )
 
-// PolicyManager manages X00 security policies
+// PolicyManager manages KernelSeal security policies
 type PolicyManager struct {
-	config         *X00Config
+	config         *KernelSealConfig
 	configPath     string
 	secretInjector *secrets.Injector
 	mu             sync.RWMutex
@@ -28,8 +28,8 @@ type PolicyManager struct {
 	onPolicyUpdate func(types.PolicyConfig)
 }
 
-// X00Config represents the complete X00 configuration
-type X00Config struct {
+// KernelSealConfig represents the complete KernelSeal configuration
+type KernelSealConfig struct {
 	Version    string           `yaml:"version" json:"version"`
 	Policy     PolicySpec       `yaml:"policy" json:"policy"`
 	Secrets    []SecretBinding  `yaml:"secrets" json:"secrets"`
@@ -115,9 +115,9 @@ func NewPolicyManager(secretInjector *secrets.Injector) *PolicyManager {
 	}
 }
 
-// DefaultConfig returns the default X00 configuration
-func DefaultConfig() *X00Config {
-	return &X00Config{
+// DefaultConfig returns the default KernelSeal configuration
+func DefaultConfig() *KernelSealConfig {
+	return &KernelSealConfig{
 		Version: "v1",
 		Policy: PolicySpec{
 			Mode:               "enforce",
@@ -134,7 +134,7 @@ func DefaultConfig() *X00Config {
 			Enabled:     true,
 			MetricsPort: 9090,
 			LogLevel:    "info",
-			AuditLog:    "/var/log/x00/audit.log",
+			AuditLog:    "/var/log/kernelseal/audit.log",
 		},
 	}
 }
@@ -153,7 +153,7 @@ func (pm *PolicyManager) LoadConfig(path string) error {
 		return fmt.Errorf("failed to stat config path: %w", err)
 	}
 
-	var config *X00Config
+	var config *KernelSealConfig
 	if info.IsDir() {
 		config, err = pm.loadConfigFromDir(path)
 	} else {
@@ -170,7 +170,7 @@ func (pm *PolicyManager) LoadConfig(path string) error {
 	pm.config = config
 	pm.mu.Unlock()
 
-	log.Printf("[CONFIG] Loaded X00 configuration from %s", path)
+	log.Printf("[CONFIG] Loaded KernelSeal configuration from %s", path)
 
 	// Apply policy (these methods handle their own locking)
 	pm.applyPolicy()
@@ -181,7 +181,7 @@ func (pm *PolicyManager) LoadConfig(path string) error {
 	return nil
 }
 
-func (pm *PolicyManager) loadConfigFromFile(path string) (*X00Config, error) {
+func (pm *PolicyManager) loadConfigFromFile(path string) (*KernelSealConfig, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -212,7 +212,7 @@ func (pm *PolicyManager) loadConfigFromFile(path string) (*X00Config, error) {
 	return config, nil
 }
 
-func (pm *PolicyManager) loadConfigFromDir(dir string) (*X00Config, error) {
+func (pm *PolicyManager) loadConfigFromDir(dir string) (*KernelSealConfig, error) {
 	// Look for config files in the directory (ConfigMap mount style)
 	config := DefaultConfig()
 
@@ -314,7 +314,7 @@ func (pm *PolicyManager) resolveSecretValue(source SecretSource) (string, error)
 	if source.SecretKeyRef != nil {
 		// For now, check if the secret is mounted as a file
 		// This is the typical pattern when using K8s secrets as volume mounts
-		mountPath := fmt.Sprintf("/var/run/secrets/x00/%s/%s",
+		mountPath := fmt.Sprintf("/var/run/secrets/kernelseal/%s/%s",
 			source.SecretKeyRef.Name, source.SecretKeyRef.Key)
 		if data, err := os.ReadFile(mountPath); err == nil {
 			return strings.TrimSpace(string(data)), nil
@@ -368,7 +368,7 @@ func (pm *PolicyManager) GetBPFPolicy() types.PolicyConfig {
 }
 
 // GetConfig returns the current configuration
-func (pm *PolicyManager) GetConfig() *X00Config {
+func (pm *PolicyManager) GetConfig() *KernelSealConfig {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 	return pm.config
@@ -417,5 +417,5 @@ func boolToUint8(b bool) uint8 {
 
 // ApplyFileProtectionPolicy is a legacy function for backwards compatibility
 func ApplyFileProtectionPolicy() {
-	log.Println("[INFO] [X00] File protection policy initialized (see BPF manager for LSM hooks)")
+	log.Println("[INFO] [KernelSeal] File protection policy initialized (see BPF manager for LSM hooks)")
 }

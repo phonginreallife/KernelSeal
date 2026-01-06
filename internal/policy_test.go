@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"x00/internal/secrets"
-	"x00/internal/types"
+	"kernelseal/internal/secrets"
+	"kernelseal/internal/types"
 )
 
 func TestDefaultConfig(t *testing.T) {
